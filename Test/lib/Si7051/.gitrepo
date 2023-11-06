@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/closedcube/ClosedCube_Si7051_Arduino.git
+	branch = master
+	commit = 3bbc39c5b13fbf79f7cdd2318e0973e84c5d748e
+	parent = 34cc35353aa4a59b3f39a2f0487c263cb8819fb0
+	method = merge
+	cmdver = 0.4.6
