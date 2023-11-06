@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/NilsMinor/TMP117-Arduino.git
+	branch = master
+	commit = 654d4b1325d0d2395fb12d4e5762e1a5e0203208
+	parent = f5827e58a7c72c6487ba82b8544dd6861ddfbd11
+	method = merge
+	cmdver = 0.4.6
