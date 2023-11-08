@@ -1,6 +1,6 @@
 /*
 
-Arduino Library for Silicon Labs Si7051 ±0.1°C (max) Digital Temperature Sensor
+Arduino Library for Silicon Labs Si7051 ï¿½0.1ï¿½C (max) Digital Temperature Sensor
 Written by AA for ClosedCube
 ---
 
@@ -29,28 +29,25 @@ THE SOFTWARE.
 */
 
 
-#ifndef _CLOSEDCUBE_SI7051_h
+#ifndef _SI7051_h
 
-#define _CLOSEDCUBE_SI7051_h
+#define _SI7051_h
 #include <Arduino.h>
 
 typedef union {
 	uint8_t rawData;
 	struct {
 		uint8_t resolution0 : 1;
-		uint8_t reserve1 : 4;
+		uint8_t reserve1 : 5;
 		uint8_t vdds : 1; // vdds = 1 if and only if VDD between 1.8V and 1.9V
-		uint8_t reserved2 : 1;
 		uint8_t resolution7 : 1;
 	};
 } SI7051_Register;
 
 
-class ClosedCube_Si7051 {
+class Si7051 {
 public:
-	ClosedCube_Si7051();
-
-	void begin(uint8_t address);
+	Si7051(TwoWire* wire, uint8_t address);
 	void setResolution(uint8_t resolution);
 
 	void reset();
@@ -61,6 +58,7 @@ public:
 	float readT(); // short-cut for readTemperature
 
 private:
+	TwoWire* _wire;
 	uint8_t _address;
 
 };

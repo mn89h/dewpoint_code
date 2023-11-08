@@ -30,78 +30,80 @@ THE SOFTWARE.
 */
 
 #include <Wire.h>
-#include "ClosedCube_Si7051.h"
+#include "Si7051.h"
 
-ClosedCube_Si7051::ClosedCube_Si7051()
+Si7051::Si7051(TwoWire* wire, uint8_t address) 
 {
-}
-
-void ClosedCube_Si7051::begin(uint8_t address) {
 	_address = address;
-	Wire.begin();
 
 	setResolution(14);
 }
 
-void ClosedCube_Si7051::reset()
+void Si7051::reset()
 {
-	Wire.beginTransmission(_address);
-	Wire.write(0xFE);
-	Wire.endTransmission();
+	_wire->beginTransmission(_address);
+	_wire->write(0xFE);
+	_wire->endTransmission();
 }
 
-uint8_t ClosedCube_Si7051::readFirmwareVersion()
+uint8_t Si7051::readFirmwareVersion()
 {
-	Wire.beginTransmission(_address);
-	Wire.write(0x84);
-	Wire.write(0xB8);
-	Wire.endTransmission();
+	_wire->beginTransmission(_address);
+	_wire->write(0x84);
+	_wire->write(0xB8);
+	_wire->endTransmission();
 
-	Wire.requestFrom(_address, (uint8_t)1);
+	_wire->requestFrom(_address, (uint8_t)1);
 
-	return Wire.read();
+	return _wire->read();
 }
 
-void ClosedCube_Si7051::setResolution(uint8_t resolution)
+void Si7051::setResolution(uint8_t resolution)
 {
 	SI7051_Register reg;
 
 	switch (resolution)
 	{
-		case 12:
-			reg.resolution0 = 1;
-			break;	
+		case 14:
+			reg.resolution0 = 0;
+			reg.resolution7 = 0;
+			break;
 		case 13:
+			reg.resolution0 = 0;
 			reg.resolution7 = 1;
 			break;
+		case 12:
+			reg.resolution0 = 1;
+			reg.resolution7 = 0;
+			break;	
 		case 11:
 			reg.resolution0 = 1;
 			reg.resolution7 = 1;
 			break;
 	}
 	
-	Wire.beginTransmission(_address);
-	Wire.write(0xE6);
-	Wire.write(reg.rawData);
-	Wire.endTransmission();
+	_wire->beginTransmission(_address);
+	_wire->write(0xE6);
+	_wire->write(reg.rawData);
+	_wire->endTransmission();
 }
 
 
-float ClosedCube_Si7051::readT() {
+float Si7051::readT() {
 	return readTemperature();
 }
 
-float ClosedCube_Si7051::readTemperature() {
-	Wire.beginTransmission(_address);
-	Wire.write(0xF3);
-	Wire.endTransmission();
+float Si7051::readTemperature() {
+	_wire->beginTransmission(_address);
+	_wire->write(0xF3); //no hold master (NACK during measurement); use 0xE3 for holding SCK line
+	_wire->endTransmission();
 
 	delay(10);
 
-	Wire.requestFrom(_address, (uint8_t)2);
+	_wire->requestFrom(_address, (uint8_t)2);
 
-	byte msb = Wire.read();
-	byte lsb = Wire.read();
+	byte msb = _wire->read();
+	byte lsb = _wire->read();
 
 	uint16_t val = msb << 8 | lsb;
 
