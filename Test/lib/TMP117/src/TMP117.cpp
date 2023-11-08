@@ -15,9 +15,8 @@
     @brief   Constructor 
     @param   addr device I2C address [0x48 - 0x4B]
 */
-TMP117::TMP117 (uint8_t addr) {
-  Wire.begin();
-  
+TMP117::TMP117 (TwoWire* wire, uint8_t addr) {
+  wire = wire;
   address = addr;
   alert_pin = -1;
   alert_type = TMP117_ALERT::NOALERT;
@@ -26,14 +25,21 @@ TMP117::TMP117 (uint8_t addr) {
 
 /*!
     @brief   Initialize in default mode 
+*/
+void TMP117::init ( void ) {
+  setConvMode (TMP117_CMODE::CONTINUOUS);
+  setConvTime (TMP117_CONVT::C15mS5);
+  setAveraging (TMP117_AVE::AVE8);
+  setAlertMode (TMP117_PMODE::DATA);
+  setOffsetTemperature(0);
+}
+
+/*!
+    @brief   Initialize in default mode 
     @param   _newDataCallback   callback function will be called when new data is available
 */
 void TMP117::init ( void (*_newDataCallback) (void) ) {
-  setConvMode (TMP117_CMODE::CONTINUOUS);
-  setConvTime (TMP117_CONVT::C125mS);
-  setAveraging (TMP117_AVE::AVE8);
-  setAlertMode (TMP117_PMODE::DATA);
-  setOffsetTemperature(0);    
+  init();
   
   newDataCallback = _newDataCallback;
 }
@@ -306,11 +312,11 @@ uint16_t  TMP117::readEEPROM (uint8_t eeprom_nr) {
     @param    data data to write
 */
 void      TMP117::i2cWrite2B (uint8_t reg, uint16_t data){
-  Wire.beginTransmission(address); 
-  Wire.write( reg );
-  Wire.write( (data>>8) );
-  Wire.write( (data&0xff) );
-  Wire.endTransmission( );
+  wire->beginTransmission(address); 
+  wire->write( reg );
+  wire->write( (data>>8) );
+  wire->write( (data&0xff) );
+  wire->endTransmission( );
   delay(10);
 }
 
@@ -325,13 +331,13 @@ uint16_t  TMP117::i2cRead2B (uint8_t reg) {
   uint8_t data[2] = {0}; 
   int16_t datac = 0;   
 
-  Wire.beginTransmission(address); 
-  Wire.write(reg); 
-  Wire.endTransmission(); 
-  Wire.requestFrom((uint8_t)address, (uint8_t)2); 
-  if(Wire.available() <= 2){  
-    data[0] = Wire.read(); 
-    data[1] = Wire.read();  
+  wire->beginTransmission(address); 
+  wire->write(reg); 
+  wire->endTransmission(); 
+  wire->requestFrom((uint8_t)address, (uint8_t)2); 
+  if(wire->available() <= 2){  
+    data[0] = wire->read(); 
+    data[1] = wire->read();  
     datac = ((data[0] << 8) | data[1]); 
   }
   return datac;

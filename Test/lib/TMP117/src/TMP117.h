@@ -72,7 +72,8 @@ enum class TMP117_ALERT     {NOALERT = 0, HIGHALERT, LOWALERT};                 
 class TMP117 {
 
   public:
-              TMP117 (uint8_t addr);
+              TMP117 (TwoWire* wire, uint8_t addr);
+    void      init ( void );
     void      init ( void (*_newDataCallback) (void) );
     void      update (void);
     void      softReset ( void );
@@ -99,6 +100,7 @@ class TMP117 {
    
   private:
   
+    TwoWire* wire;
     uint8_t   address;
     int8_t    alert_pin;
     TMP117_ALERT alert_type;
