@@ -32,22 +32,29 @@ THE SOFTWARE.
 #include <Wire.h>
 #include "Si7051.h"
 
-Si7051::Si7051(TwoWire* wire, uint8_t address) 
-{
+/// @brief Constructor
+/// @param wire I2C line
+/// @param address I2C device address
+Si7051::Si7051(TwoWire* wire, uint8_t address) {
 	_address = address;
+	_wire = wire;
+}
 
+/// @brief initializes the device by setting the resolution to 14 bits
+void Si7051::init() {
 	setResolution(14);
 }
 
-void Si7051::reset()
-{
+/// @brief resets all registers
+void Si7051::reset() {
 	_wire->beginTransmission(_address);
 	_wire->write(0xFE);
 	_wire->endTransmission();
 }
 
-uint8_t Si7051::readFirmwareVersion()
-{
+/// @brief Read firmware version
+/// @return firmware version
+uint8_t Si7051::readFirmwareVersion() {
 	_wire->beginTransmission(_address);
 	_wire->write(0x84);
 	_wire->write(0xB8);
@@ -58,12 +65,12 @@ uint8_t Si7051::readFirmwareVersion()
 	return _wire->read();
 }
 
-void Si7051::setResolution(uint8_t resolution)
-{
+/// @brief Sets the resolution of the measurement
+/// @param resolution resolution in bits, ranging from 11-14 bits
+void Si7051::setResolution(uint8_t resolution) {
 	SI7051_Register reg;
 
-	switch (resolution)
-	{
+	switch (resolution) {
 		case 14:
 			reg.resolution0 = 0;
 			reg.resolution7 = 0;
@@ -88,28 +95,38 @@ void Si7051::setResolution(uint8_t resolution)
 	_wire->endTransmission();
 }
 
-
-float Si7051::readT() {
-	return readTemperature();
+/// @brief Initiate a temperature measurement and read back the result.
+/// @return temperatute in °C
+float Si7051::readTemperature() {
+	requestTemperatureDataBlocking();
+	//delay(10);
+	return receiveTemperatureData();
 }
 
-float Si7051::readTemperature() {
+/// @brief Initiates a measurement w/o blocking I2C communication, if readout is performed before finish NACK is returned (SCK not hold)
+void Si7051::requestTemperatureDataNonBlocking() {
 	_wire->beginTransmission(_address);
 	_wire->write(0xF3); //no hold master (NACK during measurement); use 0xE3 for holding SCK line
 	_wire->endTransmission();
+}
 
-	delay(10);
+/// @brief Initiates a measurement w/ blocking I2C communication, SCK is stretched until measurement is complete
+void Si7051::requestTemperatureDataBlocking() {
+	_wire->beginTransmission(_address);
+	_wire->write(0xE3); //no hold master (NACK during measurement); use 0xE3 for holding SCK line
+	_wire->endTransmission();
+}
 
+/// @brief Read back the measured temperature.
+/// @return temperature in °C
+float Si7051::receiveTemperatureData() {
 	_wire->requestFrom(_address, (uint8_t)2);
 
-	byte msb = _wire->read();
-	byte lsb = _wire->read();
+	uint8_t msb = _wire->read();
+	uint8_t lsb = _wire->read();
 
 	uint16_t val = msb << 8 | lsb;
 
 	return (175.72*val) / 65536 - 46.85;
 }
-
-
-
 

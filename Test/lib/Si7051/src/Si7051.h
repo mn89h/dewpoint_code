@@ -50,12 +50,15 @@ public:
 	Si7051(TwoWire* wire, uint8_t address);
 	void setResolution(uint8_t resolution);
 
+	void init();
 	void reset();
 
 	uint8_t readFirmwareVersion();
 
 	float readTemperature();
-	float readT(); // short-cut for readTemperature
+	void requestTemperatureDataNonBlocking();
+	void requestTemperatureDataBlocking();
+	float receiveTemperatureData();
 
 private:
 	TwoWire* _wire;
