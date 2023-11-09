@@ -47,7 +47,7 @@
 
 #define TMP117_RESOLUTION               (double)0.0078125
 
-typedef void (*allert_callback)(void);
+typedef void (*allert_callback)();
 
 
 /*  Conversion Cycle Time in CC Mode
@@ -72,31 +72,31 @@ enum class TMP117_ALERT     {NOALERT = 0, HIGHALERT, LOWALERT};                 
 class TMP117 {
 
   public:
-              TMP117 (TwoWire* wire, uint8_t addr);
-    void      init ( void );
-    void      init ( void (*_newDataCallback) (void) );
-    void      update (void);
-    void      softReset ( void );
+              TMP117(TwoWire* wire, uint8_t addr);
+    void      init();
+    void      init(void (*_newDataCallback) ());
+    void      update();
+    void      softReset();
 
-    void      setAlertMode ( TMP117_PMODE mode);
-    void      setAllertCallback ( void (*allert_callback)(void), uint8_t pin );
-    void      setAllertTemperature ( double lowtemp, double hightemp );
-    void      setConvMode ( TMP117_CMODE cmode);
-    void      setConvTime ( TMP117_CONVT convtime );
-    void      setAveraging ( TMP117_AVE ave );
-    void      setOffsetTemperature ( double offset );
-    void      setTargetTemperature ( double target );
+    void      setAlertMode(TMP117_PMODE mode);
+    void      setAllertCallback(void (*allert_callback)(), uint8_t pin);
+    void      setAllertTemperature(double lowtemp, double hightemp);
+    void      setConvMode(TMP117_CMODE cmode);
+    void      setConvTime(TMP117_CONVT convtime);
+    void      setAveraging(TMP117_AVE ave);
+    void      setOffsetTemperature(double offset);
+    void      setTargetTemperature(double target);
 
-    double    getTemperature ( void );
-    uint16_t  getDeviceID ( void );
-    uint16_t  getDeviceRev ( void );
-    double    getOffsetTemperature ( void );
-    TMP117_ALERT getAlertType ( void );
+    double    getTemperature();
+    uint16_t  getDeviceID();
+    uint16_t  getDeviceRev();
+    double    getOffsetTemperature();
+    TMP117_ALERT getAlertType();
     
-    void      writeEEPROM ( uint16_t data, uint8_t eeprom_nr );
-    uint16_t  readEEPROM ( uint8_t eeprom_nr );
-    uint16_t  readConfig ( void );
-    void      printConfig ( void );
+    void      writeEEPROM(uint16_t data, uint8_t eeprom_nr);
+    uint16_t  readEEPROM(uint8_t eeprom_nr);
+    uint16_t  readConfig();
+    void      printConfig();
    
   private:
   
@@ -105,18 +105,15 @@ class TMP117 {
     int8_t    alert_pin;
     TMP117_ALERT alert_type;
 
-    void      i2cWrite2B ( uint8_t reg, uint16_t data );
-    uint16_t  i2cRead2B ( uint8_t reg );
-    void      writeConfig ( uint16_t config_data );
-    void      lockEEPROM ( void );
-    void      unlockEEPROM ( void );
-    bool      EEPROMisBusy ( void );
+    void      i2cWrite2B(uint8_t reg, uint16_t data);
+    uint16_t  i2cRead2B(uint8_t reg);
+    void      writeConfig(uint16_t config_data);
+    void      lockEEPROM();
+    void      unlockEEPROM();
+    bool      EEPROMisBusy();
 
-    void      (*newDataCallback) ( void );
+    void      (*newDataCallback)();
     
 };
-
-
-
 
 #endif
