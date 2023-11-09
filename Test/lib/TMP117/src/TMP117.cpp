@@ -19,7 +19,7 @@ TMP117::TMP117 (TwoWire* wire, uint8_t addr) {
   newDataCallback = NULL;
 }
 
-/// @brief   Initialize in default mode 
+/// @brief   Initialize in default mode (continuous, 15.5 ms, averaging over 8) 
 void TMP117::init (void) {
   setConvMode (TMP117_CMODE::CONTINUOUS);
   setConvTime (TMP117_CONVT::C15mS5);
@@ -131,7 +131,7 @@ void TMP117::setOffsetTemperature (double offset) {
 /// @brief    Set target temperature for calibration purpose
 /// @param    double  target temperature to calibrate to in the range of ±256°C  
 void TMP117::setTargetTemperature (double target) {
-  double actual_temp = getTemperature ();
+  double actual_temp = readTemperature ();
   double delta_temp =  target - actual_temp;
   setOffsetTemperature (delta_temp);
 }
@@ -168,7 +168,7 @@ uint16_t  TMP117::readConfig (void) {
 
 /// @brief    Returns the recalculated temperature
 /// @return   double  temperature in °C
-double    TMP117::getTemperature (void) {
+double    TMP117::readTemperature (void) {
   int16_t temp = i2cRead2B(TMP117_REG_TEMPERATURE);
   return  (temp * TMP117_RESOLUTION);
 }

@@ -87,7 +87,7 @@ class TMP117 {
     void      setOffsetTemperature(double offset);
     void      setTargetTemperature(double target);
 
-    double    getTemperature();
+    double    readTemperature();
     uint16_t  getDeviceID();
     uint16_t  getDeviceRev();
     double    getOffsetTemperature();
