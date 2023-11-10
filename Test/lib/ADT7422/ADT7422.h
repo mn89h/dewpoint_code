@@ -15,12 +15,12 @@
 
 #define ADT7422_I2CADDR_DEFAULT 0x48 ///< I2C address
 
-#define ADT7422_REG__ADT7422_TEMPMSB 0x0 ///< Temp. value MSB
-#define ADT7422_REG__ADT7422_TEMPLSB 0x1 ///< Temp. value LSB
-#define ADT7422_REG__ADT7422_STATUS 0x2  ///< Status register
-#define ADT7422_REG__ADT7422_CONFIG 0x3  ///< Configuration register
-#define ADT7422_REG__ADT7422_ID 0xB      ///< Manufacturer identification
-#define ADT7422_REG__ADT7422_SWRST 0x2F  ///< Temperature hysteresis
+#define ADT7422_REG__TEMPMSB 0x0 ///< Temp. value MSB
+#define ADT7422_REG__TEMPLSB 0x1 ///< Temp. value LSB
+#define ADT7422_REG__STATUS 0x2  ///< Status register
+#define ADT7422_REG__CONFIG 0x3  ///< Configuration register
+#define ADT7422_REG__ID 0xB      ///< Manufacturer identification
+#define ADT7422_REG__SWRST 0x2F  ///< Temperature hysteresis
 
 
 typedef union {

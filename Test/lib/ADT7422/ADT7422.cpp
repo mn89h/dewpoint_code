@@ -53,7 +53,7 @@ void ADT7422::init() {
 /// @brief Writes the configuration
 void ADT7422::writeConfig() {
   wire->beginTransmission(address);
-	wire->write(ADT7422_REG__ADT7422_CONFIG);
+	wire->write(ADT7422_REG__CONFIG);
   wire->write(config.rawData);
 	wire->endTransmission();
 }
@@ -78,7 +78,7 @@ void ADT7422::setOperationMode(ADT7422_OPMODE opmode) {
  */
 void ADT7422::reset() {
   wire->beginTransmission(address);
-	wire->write(ADT7422_REG__ADT7422_SWRST);
+	wire->write(ADT7422_REG__SWRST);
 	wire->endTransmission();
   delay(10);
 }
@@ -90,7 +90,7 @@ void ADT7422::reset() {
  */
 float ADT7422::readTemperature() {
   wire->beginTransmission(address);
-	wire->write(ADT7422_REG__ADT7422_TEMPMSB);
+	wire->write(ADT7422_REG__TEMPMSB);
 	wire->endTransmission();
 
 	wire->requestFrom(address, (uint8_t)2);
