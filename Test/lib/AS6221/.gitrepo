@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/will2055/AS6212-Arduino-Library.git
+	branch = main
+	commit = dfa741a9573b15239321b7696df448cb51b63ccb
+	parent = 1256ba3770eb8da6e4e5b23e8fc8d4a8eff8ecdf
+	method = merge
+	cmdver = 0.4.6
