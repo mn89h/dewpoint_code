@@ -100,7 +100,8 @@ float ADT7422::readTemperature() {
 
 	uint16_t val = msb << 8 | lsb;
 
-  float temp = val / 128.0;
+  float temp = (int16_t) val;
+  temp = temp / 128.0;
 
   return temp;
 }
