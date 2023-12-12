@@ -1,59 +1,63 @@
 #include <Arduino.h>
-#include <USBSerial.h>
-#include <stm32g4xx.h>
 #include <Wire.h>
+#include <stm32g4xx.h>
+#include <USBSerial.h>
+
+#include <list>
+#include <memory>
+
+#include "TemperatureSensor.h"
 
 // Select the correct address setting
-uint8_t TMP117_ADDR_GND =  0x48;   // 1001000 
-uint8_t TMP117_ADDR_VCC =  0x49;   // 1001001
-uint8_t TMP117_ADDR_SDA =  0x4A;   // 1001010
-uint8_t TMP117_ADDR_SCL =  0x4B;   // 1001011
-uint8_t SI7051_ADDR     =  0x40;
-uint8_t ADT7422_ADDR    =  0; //TODO
-uint8_t AS6221_ADDR     =  0;
+#define TMP117_ADDR_SDA 0x4A
+#define SI7051_ADDR     0x40
+#define ADT7422_ADDR    0x48
+#define AS6221_ADDR     0x49
 
-#include "TMP117.h"
-#include "Si7051.h"
+TwoWire i2c_flex1 = TwoWire(PC9, PC8);
+TwoWire i2c_flex2 = TwoWire(PB9, PB8);
+// TwoWire rigid_i2c= TwoWire();
 
-// #define ALERT_PIN               7     // low active alert pin
-// #define LOW_TEMPERATURE_ALERT   20    // low alert at 20°C
-// #define HIGH_TEMPERATURE_ALERT  28    // highalert at 28°C
-
-TwoWire upper_i2c = TwoWire();
-TwoWire lower_i2c = TwoWire();
-TwoWire rigid_i2c= TwoWire();
-TMP117 tmp117_upper(&upper_i2c, TMP117_ADDR_SDA);
-TMP117 tmp117_lower(&lower_i2c, TMP117_ADDR_SDA);
-Si7051 si7051_upper(&upper_i2c, SI7051_ADDR);
-
-
+std::list<std::unique_ptr<TemperatureSensor>> temp_sensors;
 
 void setup() {
 
   // Initiate wire library and serial communication
-  Wire.begin();
-  Serial.begin(115200); // configured as USBSerial, baud rate irrelevant
-  
-  
-  upper_i2c.setSCL(PC8);
-  upper_i2c.setSDA(PC9);
-  upper_i2c.begin();
-  
-  lower_i2c.setSCL(PC8);
-  lower_i2c.setSDA(PC9);
-  lower_i2c.begin();
-  
-  rigid_i2c.setSCL(PC8);
-  rigid_i2c.setSDA(PC9);
-  rigid_i2c.begin();
+  //Wire.begin();
+  Serial.begin(115600); // configured as USBSerial, baud rate irrelevant
+  while(!Serial.available()) {}
+  Serial.println("OK");
+  // enable flex PCB LDOs
+  pinMode(PA5, OUTPUT); //upper
+  pinMode(PA6, OUTPUT); //lower
+  digitalWrite(PA5, HIGH);
+  digitalWrite(PA6, HIGH);
 
+  i2c_flex1.begin();
+  i2c_flex2.begin();
+  // rigid_i2c.begin();
 
-  tmp117_lower.init();
-  tmp117_upper.init();     
+  delay(100);
+
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new TMP117(&i2c_flex2, TMP117_ADDR_SDA), typeid(TMP117), "J2:TMP117", 0, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new Si7051(&i2c_flex2, SI7051_ADDR), typeid(Si7051), "J2:Si7051", 1, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new AS6221(&i2c_flex2, AS6221_ADDR), typeid(AS6221), "J2:AS6221", 2, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new ADT7422(&i2c_flex2, ADT7422_ADDR), typeid(ADT7422), "J2:ADT7422", 3, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new Si7051(&i2c_flex1, SI7051_ADDR), typeid(Si7051), "J1:Si7051", 4, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new AS6221(&i2c_flex1, AS6221_ADDR), typeid(AS6221), "J1:AS6221", 5, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new ADT7422(&i2c_flex1, ADT7422_ADDR), typeid(ADT7422), "J1:ADT7422", 6, true));
+
+  for (auto &&sensor : temp_sensors){
+    sensor->init();
+  }
 }
 
 /************************* Infinite Loop Function **********************************/
 void loop() {
-  tmp117_lower.getTemperature();
-  
+  Serial.println("A");
+
+  for (auto &&sensor : temp_sensors){
+    sensor->readValue();
+  }
+  delay(2000);
 }
