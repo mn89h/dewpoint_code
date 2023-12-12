@@ -73,8 +73,8 @@ class TMP117 {
 
   public:
               TMP117(TwoWire* wire, uint8_t addr);
-    void      init();
-    void      init(void (*_newDataCallback) ());
+    bool      init();
+    bool      init(void (*_newDataCallback) ());
     void      update();
     void      softReset();
 

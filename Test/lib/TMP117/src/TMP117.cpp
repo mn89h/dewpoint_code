@@ -11,29 +11,31 @@
 
 /// @brief   Constructor 
 /// @param   addr device I2C address [0x48 - 0x4B]
-TMP117::TMP117 (TwoWire* wire, uint8_t addr) {
-  wire = wire;
-  address = addr;
+TMP117::TMP117 (TwoWire* wire, uint8_t addr) :
+  wire(wire), address(addr)
+{
   alert_pin = -1;
   alert_type = TMP117_ALERT::NOALERT;
   newDataCallback = NULL;
 }
 
 /// @brief   Initialize in default mode (continuous, 15.5 ms, averaging over 8) 
-void TMP117::init (void) {
+bool TMP117::init (void) {
   setConvMode (TMP117_CMODE::CONTINUOUS);
   setConvTime (TMP117_CONVT::C15mS5);
   setAveraging (TMP117_AVE::AVE8);
   setAlertMode (TMP117_PMODE::DATA);
   setOffsetTemperature(0);
+  return true;
 }
 
 /// @brief   Initialize in default mode 
 /// @param   _newDataCallback   callback function will be called when new data is available
-void TMP117::init (void (*_newDataCallback) (void)) {
-  init();
+bool TMP117::init (void (*_newDataCallback) (void)) {
+  bool success = init();
   
   newDataCallback = _newDataCallback;
+  return success;
 }
 
 /// @brief    Read configuration register and handle events.

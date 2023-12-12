@@ -19,14 +19,15 @@
 #include <Wire.h>
 #include "AS6221.h"
 
-AS6221::AS6221(uint8_t address, TwoWire *wire){
+AS6221::AS6221(TwoWire *wire, uint8_t address){
   _i2cPort = wire;
   _deviceAddress = address;
   config.rawData = AS6221_CONFIG_DEFAULT;
 }
 
-void AS6221::init(){
+bool AS6221::init(){
   setConversionRate(AS6221_CONVRATE::C125ms);
+  return true;
 }
 
 void AS6221::setConversionRate(AS6221_CONVRATE rate) {

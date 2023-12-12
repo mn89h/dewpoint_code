@@ -50,7 +50,7 @@ public:
 	Si7051(TwoWire* wire, uint8_t address);
 	void setResolution(uint8_t resolution);
 
-	void init();
+	bool init();
 	void reset();
 
 	uint8_t readFirmwareVersion();

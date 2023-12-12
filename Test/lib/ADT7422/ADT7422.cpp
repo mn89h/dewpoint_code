@@ -34,9 +34,9 @@
  *    @param  addr The I2C address, defaults to 0x48
  *    @param  wire The I2C interface, pointer to a TwoWire, defaults to WIre
  */
-ADT7422::ADT7422(TwoWire *wire, uint8_t addr) {
-  wire = wire;
-  address = addr;
+ADT7422::ADT7422(TwoWire *wire, uint8_t addr) :
+  wire(wire), address(addr) 
+{
   config.rawData = 0x00;
 }
 
@@ -44,10 +44,13 @@ ADT7422::ADT7422(TwoWire *wire, uint8_t addr) {
  *    @brief  Setups the HW
  *    @return True if initialization was successful, otherwise false.
  */
-void ADT7422::init() {
-  // soft reset
-  //reset();
+bool ADT7422::init() {
+  if(readDeviceID() != 0xCB) {
+    return false;
+  }
+  reset();
   setResolution(ADT7422_RES::NUMBITS16);
+  return true;
 }
 
 /// @brief Writes the configuration
@@ -84,14 +87,14 @@ void ADT7422::reset() {
 }
 
 /*!
- *   @brief  Reads the 16-bit temperature register and returns the Centigrade
+ *   @brief  Reads the 13-bit or 16-bit temperature register and returns the Centigrade
  *           temperature as a float.
  *   @return Temperature in Centigrade.
  */
 float ADT7422::readTemperature() {
   wire->beginTransmission(address);
 	wire->write(ADT7422_REG__TEMPMSB);
-	wire->endTransmission();
+	wire->endTransmission(false); // IMPORTANT: Repeated Start
 
 	wire->requestFrom(address, (uint8_t)2);
 
@@ -101,7 +104,24 @@ float ADT7422::readTemperature() {
 	uint16_t val = msb << 8 | lsb;
 
   float temp = (int16_t) val;
-  temp = temp / 128.0;
+  if(config.resolution == (uint8_t) ADT7422_RES::NUMBITS16) {   // 16-bit
+    temp = temp / 128.0;
+  }
+  else {                                                        // 13-bit
+    temp = ((int16_t) val) >> 3;
+    temp = temp / 16.0;
+  }
 
   return temp;
+}
+
+uint8_t ADT7422::readDeviceID() {
+  wire->beginTransmission(address);
+  wire->write(ADT7422_REG__ID);
+  wire->endTransmission(false); // IMPORTANT: Repeated Start
+
+  wire->requestFrom(address, 1);
+  uint8_t id = wire->read();
+
+  return id;
 }

@@ -15,12 +15,12 @@
 
 #define ADT7422_I2CADDR_DEFAULT 0x48 ///< I2C address
 
-#define ADT7422_REG__TEMPMSB 0x0 ///< Temp. value MSB
-#define ADT7422_REG__TEMPLSB 0x1 ///< Temp. value LSB
-#define ADT7422_REG__STATUS 0x2  ///< Status register
-#define ADT7422_REG__CONFIG 0x3  ///< Configuration register
-#define ADT7422_REG__ID 0xB      ///< Manufacturer identification
-#define ADT7422_REG__SWRST 0x2F  ///< Temperature hysteresis
+#define ADT7422_REG__TEMPMSB 0x00 ///< Temp. value MSB
+#define ADT7422_REG__TEMPLSB 0x01 ///< Temp. value LSB
+#define ADT7422_REG__STATUS 0x02  ///< Status register
+#define ADT7422_REG__CONFIG 0x03  ///< Configuration register
+#define ADT7422_REG__ID 0x0B      ///< Manufacturer identification
+#define ADT7422_REG__SWRST 0x2F   ///< Temperature hysteresis
 
 
 typedef union {
@@ -49,11 +49,13 @@ enum class ADT7422_RES       {NUMBITS13 = 0, NUMBITS16};                        
 class ADT7422 {
 public:
   ADT7422(TwoWire *wire, uint8_t a = ADT7422_I2CADDR_DEFAULT);
-  void init();
+  bool init();
   void reset();
   void setResolution(ADT7422_RES resolution);
   void setOperationMode(ADT7422_OPMODE opmode);
   float readTemperature();
+  uint8_t readDeviceID();
+  uint8_t readConfig();
 
 private:
   TwoWire* wire = NULL;

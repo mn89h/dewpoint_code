@@ -53,8 +53,8 @@ struct{
 
 class AS6221{
   public:
-    AS6221(uint8_t address = 0x48, TwoWire* wire);
-    void init();
+    AS6221(TwoWire* wire = &Wire, uint8_t address = 0x48);
+    bool init();
     void setConversionRate(AS6221_CONVRATE rate);
     uint8_t getAddress();
     float readTemperature();
@@ -63,7 +63,7 @@ class AS6221{
     // bool setTLow(int16_t lowLimit, uint8_t *tlow_err_flag);
     // bool setTHigh(int16_t highLimit);
   private:
-    TwoWire *_i2cPort = NULL;
+    TwoWire *_i2cPort;
     uint8_t _deviceAddress;
     AS6221_ConfigurationRegister config;
     uint16_t readRegister(uint8_t reg, uint8_t size);

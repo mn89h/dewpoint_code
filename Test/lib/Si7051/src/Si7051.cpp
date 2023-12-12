@@ -41,8 +41,9 @@ Si7051::Si7051(TwoWire* wire, uint8_t address) {
 }
 
 /// @brief initializes the device by setting the resolution to 14 bits
-void Si7051::init() {
+bool Si7051::init() {
 	setResolution(14);
+	return true;
 }
 
 /// @brief resets all registers
