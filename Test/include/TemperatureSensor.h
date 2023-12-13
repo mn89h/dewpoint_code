@@ -5,7 +5,7 @@
 #include "TMP117.h"
 
 typedef union {
-  double value;
+  float value;
   byte raw[4];
 } binaryFloat;
 typedef union {
@@ -24,6 +24,11 @@ class TemperatureSensor {
     bool init();
     float readValue(bool writeToSerial = true);
     void* getSensor();
+    void printInfo();
+    void enable();
+    void disable();
+    int getSensorId();
+    bool getStatus();
   private:
     void* sensorPtr;
     const std::type_info& sensorType;

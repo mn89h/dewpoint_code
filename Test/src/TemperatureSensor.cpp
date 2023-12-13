@@ -15,12 +15,38 @@ bool TemperatureSensor::init() {
 }
 
 float TemperatureSensor::readValue(bool writeToSerial) {
-    
+    if (!inUse) return __FLT_MAX__;
     if (sensorType == typeid(ADT7422)) return readValue(*(ADT7422*)sensorPtr, writeToSerial);
     if (sensorType == typeid(AS6221)) return readValue(*(AS6221*)sensorPtr, writeToSerial);
     if (sensorType == typeid(Si7051)) return readValue(*(Si7051*)sensorPtr, writeToSerial);
     if (sensorType == typeid(TMP117)) return readValue(*(TMP117*)sensorPtr, writeToSerial);
     return __FLT_MAX__;
+}
+
+void TemperatureSensor::printInfo(){
+    Serial.print("ID: ");
+    Serial.print(sensorId);
+    Serial.print(", NAME: ");
+    Serial.print(friendlyName);
+    Serial.print(", STATUS: ");
+    if(inUse)   Serial.println("1");
+    else        Serial.println("0");
+}
+
+void TemperatureSensor::enable(){
+    inUse = true;
+}
+
+void TemperatureSensor::disable(){
+    inUse = false;
+}
+
+int TemperatureSensor::getSensorId() {
+    return sensorId;
+}
+
+bool TemperatureSensor::getStatus(){
+    return inUse;
 }
 
 void TemperatureSensor::writeInfoToSerial(){
