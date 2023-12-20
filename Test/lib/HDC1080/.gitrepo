@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/jshnaidman/HDC1080.git
+	branch = master
+	commit = 9f9c58f853ff07d1881653cea79f77d84028e802
+	parent = 14b877d60ee479b850f0c10304857277ebddd60d
+	method = merge
+	cmdver = 0.4.6
