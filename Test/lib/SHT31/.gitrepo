@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/RobTillaart/SHT31.git
+	branch = master
+	commit = e5361f60e3f4ea31a7357055f92dee277f3b689f
+	parent = 0c938ecaea6354df8f5fa80434b5bd636ee00801
+	method = merge
+	cmdver = 0.4.6
