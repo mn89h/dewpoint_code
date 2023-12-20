@@ -1,14 +1,20 @@
+import csv
+import datetime
 import struct
 import serial
-import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import numpy as np
 import collections
 import threading
 from dataclasses import astuple, dataclass
 from time import sleep
-from random import random
+import pyvisa
+import os
+
+# May be needed for pyvisa in order to access visa32.dll (dependent on system and python configuration)
+os.add_dll_directory("C:/Program Files/Keysight/IO Libraries Suite/bin")
+os.add_dll_directory("C:/Program Files (x86)/Keysight/IO Libraries Suite/bin")
+
 
 # 12 colors
 num_plots = 12
@@ -55,26 +61,28 @@ def ReadSensors(always = True):
         id, new_data = GetSensorData()
         data[id].append(new_data)
         # print(data[id])
-
-
-def UpdateFigure(var):
-    global data
-    ax1.relim()
-    ax1.autoscale_view()
-    for i in range(len(SENSOR_IDS)):
-        if len(data[i]) > 0:                    # set only lines which can be filled with data (no display otherwise)
-            lines[i].set_data(*zip(*data[i]))   # get x (time) and y (temp/light) values 
+        if not always:
+            break
 
 # UART Connection
-comport = 'COM14'
-print("Waiting for " + comport)
+comport_board = 'COM14'
+print("Waiting for " + comport_board)
 while True:
     try:
-        s = serial.Serial(comport, 115600)
+        s = serial.Serial(comport_board, 1000000)
         break
     except serial.SerialException:
         print("Could not open port. Retrying.")
         sleep(5)
+# UART Connection
+rm = pyvisa.ResourceManager()
+# Open multimeter
+inst = rm.open_resource('GPIB0::1::INSTR')
+# Reset
+# inst.query('*RST')
+sleep(1)
+# Measurement mode
+inst.query('OHMF')
 
 # (RE)START
 s.write(str.encode("RESET\r\n"))
@@ -102,38 +110,54 @@ input()
 # Disable malfunctioning sensor
 # s.write(str.encode("TOGGLE_TEMP_SENSOR 2 0\r\n"))
 
-# Turn on temperature reading
-s.write(str.encode("READ_TEMP_ON\r\n"))
-
-# Plot setup and line styling
-fig, ax1 = plt.subplots()
-color = 'black'
-ax1.set_xlabel('time (s)')
-ax1.set_ylabel('T (°C)', color=color)
-ax1.tick_params(axis='y', labelcolor=color)
-ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-ax2.set_ylabel('Photodiode', color=color)  # we already handled the x-label with ax1
-ax2.tick_params(axis='y', labelcolor=color)
 
 # Collection for data
 data = np.empty(len(SENSOR_IDS), object)
 for i in range(len(data)):
     data[i] = collections.deque([])
 
-# Add empty lines to ax1 plot
-lines = np.empty(len(SENSOR_IDS), matplotlib.lines.Line2D)
-for i in range(len(lines)):
-    lines[i], = ax1.plot([], c=SENSOR_IDS[i].color, label=str(SENSOR_IDS[i].name))
-ax1.legend(loc="upper left")
+filename = "measurements_" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
+with open(filename, 'w', newline='') as file:
+    writer = csv.writer(file)
+    header = ["Ref Probe", ""]
+    for device in range(len(data)):
+        header.append(str(device))
+        header.append(str(SENSOR_IDS[device].name))
+    writer.writerow(header)
+    header = ["Rref", "Tref"]
+    for device in range(len(data)):
+        header.append("Time")
+        header.append("Value")
+    writer.writerow(header)
 
-# Starts reading sensor in different thread
-oThread_ReadSensors = threading.Thread(target = ReadSensors)
-oThread_ReadSensors.daemon = True
-oThread_ReadSensors.start()
+while True:
+    NUMSAMPLES = 20
+    # Wait for command
+    print("Press Enter for collecting data.")
+    input()
+    # Turn on temperature reading
+    s.write(str.encode("READ_TEMP_SAMPLES " + str(NUMSAMPLES) + "\r\n"))
+    # s.write(str.encode("READ_TEMP_OFF\r\n"))
 
-# Show plots only after some data is available
-while len(data) == 0:
-    sleep(1)
+    # Collect data
+    rrefs = []
+    for numSample in range(0, NUMSAMPLES):
+        rrefs.append(inst.read().rstrip("\r\n").lstrip(" "))
+        for device in range(len(data)):
+            ReadSensors(False)
+    
+    # Turn off temperature reading
 
-ani = animation.FuncAnimation(fig, UpdateFigure, interval=500)
-plt.show()
+    # Write data
+    with open(filename, 'a', newline='') as file:
+        writer = csv.writer(file)
+        for numSample in range(0, NUMSAMPLES):
+            row = []
+            row.append(str(rrefs[numSample]))
+            row.append("")
+            for device in range(len(data)):
+                sensordata = data[device].popleft();
+                row.append(str(sensordata.time))
+                row.append(str(sensordata.data))
+            writer.writerow(row)
+
