@@ -8,9 +8,14 @@
 #include <memory>
 
 #include "TemperatureSensor.h"
+#include "VCNL4040.hpp"
 
 std::list<std::unique_ptr<TemperatureSensor>> temp_sensors;
+std::unique_ptr<VCNL4040> light_sensor;
 bool readTemperature;
+bool readLight;
+int readTemperatureSamples;
+int currentTemperatureSample = 0;
 
 void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
   sender->GetSerial()->print("Unrecognized command [");
@@ -28,6 +33,23 @@ void readTemperature_on(SerialCommands* sender) {
 
 void readTemperature_off(SerialCommands* sender) {
   readTemperature = false;
+}
+
+void readLight_on(SerialCommands* sender) {
+  readLight = true;
+}
+
+void readTemperature_setSamples(SerialCommands* sender) {
+  char* numSamples_str = sender->Next();
+	if (numSamples_str == NULL) {
+		sender->GetSerial()->println("ERROR NO_ID");
+		return;
+	}
+  readTemperatureSamples = atoi(numSamples_str);
+}
+
+void readLight_off(SerialCommands* sender) {
+  readLight = false;
 }
 
 void enumerate(SerialCommands* sender) {
@@ -73,6 +95,9 @@ SerialCommand cmd_listTempSensors("LIST_TEMP_SENSORS", enumerate);
 SerialCommand cmd_toggleTempSensor("TOGGLE_TEMP_SENSOR", toggleTempSensor);
 SerialCommand cmd_readTemperature_on("READ_TEMP_ON", readTemperature_on);
 SerialCommand cmd_readTemperature_off("READ_TEMP_OFF", readTemperature_off);
+SerialCommand cmd_readTemperature_samples("READ_TEMP_SAMPLES", readTemperature_setSamples);
+SerialCommand cmd_readLight_on("READ_LIGHT_ON", readLight_on);
+SerialCommand cmd_readLight_off("READ_LIGHT_OFF", readLight_off);
 SerialCommand cmd_reset("RESET", reset);
 
 // Select the correct address setting
@@ -81,16 +106,19 @@ SerialCommand cmd_reset("RESET", reset);
 #define ADT7422_ADDR    0x48
 #define AS6221_ADDR     0x49
 
-TwoWire i2c_flex1 = TwoWire(PC9, PC8);
+// TwoWire i2c_flex1 = TwoWire(PC9, PC8);
+// TwoWire i2c_flex2 = TwoWire(PB9, PB8);
+// TwoWire i2c_rigid = TwoWire(PA8, PA9);
+TwoWire i2c_rigid = TwoWire(PC9, PC8);
+TwoWire i2c_flex1 = TwoWire(PA8, PA9);
 TwoWire i2c_flex2 = TwoWire(PB9, PB8);
-// TwoWire rigid_i2c= TwoWire();
 
 
 void setup() {
 
   // Initiate wire library and serial communication
   //Wire.begin();
-  Serial.begin(115600); // configured as USBSerial, baud rate irrelevant
+  Serial.begin(1000000); // configured as USBSerial, baud rate irrelevant
   // while(!Serial.available()) {}
   Serial.println("OK");
 
@@ -98,6 +126,9 @@ void setup() {
   serial_commands_.SetDefaultHandler(cmd_unrecognized);
   serial_commands_.AddCommand(&cmd_readTemperature_on);
   serial_commands_.AddCommand(&cmd_readTemperature_off);
+  serial_commands_.AddCommand(&cmd_readTemperature_samples);
+  serial_commands_.AddCommand(&cmd_readLight_on);
+  serial_commands_.AddCommand(&cmd_readLight_off);
   serial_commands_.AddCommand(&cmd_listTempSensors);
   serial_commands_.AddCommand(&cmd_toggleTempSensor);
   serial_commands_.AddCommand(&cmd_reset);
@@ -111,7 +142,7 @@ void setup() {
 
   i2c_flex1.begin();
   i2c_flex2.begin();
-  // rigid_i2c.begin();
+  i2c_rigid.begin();
 
   delay(100);
 
@@ -126,15 +157,46 @@ void setup() {
   for (auto &&sensor : temp_sensors){
     sensor->init();
   }
+
+  while(!Serial.available()) {}
+  light_sensor = std::make_unique<VCNL4040>(&i2c_rigid, (uint8_t)0x60); 
+  i2c_rigid.beginTransmission(0x70);
+  i2c_rigid.write(0x02);
+  i2c_rigid.endTransmission();
+  i2c_rigid.requestFrom(0x70, 2);
+
+  light_sensor->init();
+  light_sensor->setProximityLEDCurrent(VCNL4040_LEDCurrent::LED_CURRENT_200MA);
+  light_sensor->setProximityIntegrationTime(VCNL4040_ProximityIntegration::PROXIMITY_INTEGRATION_TIME_8T);
+
+  i2c_rigid.beginTransmission(0x60);
+  i2c_rigid.write(0x03);
+  i2c_rigid.endTransmission(false);
+  i2c_rigid.requestFrom(0x60, 2);
+  uint8_t lower = i2c_rigid.read();
+  uint8_t higher = i2c_rigid.read();
+  Serial.println(lower);
+  Serial.println(higher);
 }
 
 /************************* Infinite Loop Function **********************************/
 void loop() {
   serial_commands_.ReadSerial();
-  if (readTemperature) {
+  if (readTemperature || currentTemperatureSample < readTemperatureSamples) {
     for (auto &&sensor : temp_sensors){
       sensor->readValue();
     }
+    if (currentTemperatureSample < readTemperatureSamples) 
+      currentTemperatureSample += 1;
+    if (currentTemperatureSample == readTemperatureSamples) {
+      currentTemperatureSample = 0;
+      readTemperatureSamples = 0;
+    }
   }
-  delay(250);
+  if (readLight) {
+    Serial.println(light_sensor->getProximity());
+    Serial.println(light_sensor->getAmbientLight());
+    // Serial.println(light_sensor->getLux());
+  }
+  delay(50);
 }
