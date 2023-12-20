@@ -32,10 +32,9 @@
  *    @param  i2c_address
  *            The I2C address to be used.
  */
-VCNL4040::VCNL4040(TwoWire *wire, uint8_t i2c_addr = VCNL4040_I2CADDR_DEFAULT) {
-  wire = wire;
-  address = i2c_addr;
-
+VCNL4040::VCNL4040(TwoWire *wire, uint8_t i2c_addr) :
+  wire(wire), address(i2c_addr) 
+{
   als_conf.rawData = 0x0001;
   als_thdHigh.rawData = 0x0000;
   als_thdLow.rawData = 0x0000;
@@ -51,11 +50,11 @@ VCNL4040::VCNL4040(TwoWire *wire, uint8_t i2c_addr = VCNL4040_I2CADDR_DEFAULT) {
  *    @brief  Initializes the settings
  *    @return True if initialization was successful, otherwise false.
  */
-boolean VCNL4040::init() {
+bool VCNL4040::init() {
   return _init();
 }
 
-boolean VCNL4040::_init() {
+bool VCNL4040::_init() {
   enableProximity(true);
   enableWhiteLight(true);
   enableAmbientLight(true);
@@ -110,7 +109,7 @@ float VCNL4040::getLux() {
             set to false to disable.
 */
 void VCNL4040::enableProximity(bool enable) {
-  ps_conf12.sd = (uint8_t) enable;
+  ps_conf12.sd = (uint8_t) ~enable;
   writeRegister(VCNL4040_REG__PS_CONF1_2, ps_conf12.rawData);
 }
 
@@ -121,7 +120,7 @@ void VCNL4040::enableProximity(bool enable) {
             set to false to disable.
 */
 void VCNL4040::enableAmbientLight(bool enable) {
-  als_conf.sd = (uint8_t) enable;
+  als_conf.sd = (uint8_t) ~enable;
   writeRegister(VCNL4040_REG__ALS_CONF1, als_conf.rawData);
 }
 
@@ -132,7 +131,7 @@ void VCNL4040::enableAmbientLight(bool enable) {
             set to false to disable.
 */
 void VCNL4040::enableWhiteLight(bool enable) {
-  ps_conf3Ms.white_en = (uint8_t) enable;
+  ps_conf3Ms.white_en = (uint8_t) ~enable;
   writeRegister(VCNL4040_REG__PS_CONF3_MS, ps_conf3Ms.rawData);
 }
 
@@ -257,6 +256,8 @@ void VCNL4040::writeRegister(uint8_t reg, uint16_t data) {
 	wire->write(reg);
   wire->write(lowByte(data));
   wire->write(highByte(data));
+  Serial.println(lowByte(data));
+  Serial.println(highByte(data));
 	wire->endTransmission();
 }
 
@@ -268,7 +269,7 @@ void VCNL4040::writeRegister(uint8_t reg, uint16_t data) {
 uint16_t VCNL4040::readRegister(uint8_t reg) {
   wire->beginTransmission(address);
 	wire->write(reg);
-	wire->endTransmission();
+	wire->endTransmission(false);
 
 	wire->requestFrom(address, (uint8_t)2);
 

@@ -151,7 +151,7 @@ enum class VCNL4040_InterruptType { PROXIMITY_AWAY, PROXIMITY_CLOSE, AMBIENT_HIG
 class VCNL4040 {
 public:
   VCNL4040(TwoWire *wire, uint8_t i2c_addr = VCNL4040_I2CADDR_DEFAULT);
-  boolean init();
+  bool init();
   uint16_t getProximity();
   uint16_t getAmbientLight();
   uint16_t getWhiteLight();
