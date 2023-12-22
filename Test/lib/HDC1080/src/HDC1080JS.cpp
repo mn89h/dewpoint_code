@@ -1,8 +1,22 @@
 #include "Wire.h"
 #include "HDC1080JS.h"
 
-HDC1080JS::HDC1080JS(){
+HDC1080JS::HDC1080JS(TwoWire* wire, uint8_t address) : 
+	_wire(wire), _address(address)
+{
+}
 
+bool HDC1080JS::init() {
+	config();
+	delay(15);
+
+	// Start one measurement
+	_wire->beginTransmission(_address);
+	_wire->write(0x00);
+	_wire->endTransmission();
+	delay(15);
+
+	return true;
 }
 
 void HDC1080JS::config(){
@@ -18,25 +32,30 @@ void HDC1080JS::config(){
 }
 
 void HDC1080JS::writeRegister(uint8_t address, uint16_t value){
-	Wire.beginTransmission(ADDR);
-	Wire.write(address);
-	Wire.write(value);
-	Wire.endTransmission();
+	_wire->beginTransmission(_address);
+	_wire->write(address);
+	_wire->write(value);
+	_wire->endTransmission();
 }
 
 
 
-void HDC1080JS::readTempHumid(){
+void HDC1080JS::requestMeas(){
 	//set pointer register
-	Wire.beginTransmission(ADDR);
-	Wire.write(0x00);
-	Wire.endTransmission();
-	delay(15);
-	Wire.requestFrom(ADDR, 4);
-	temperatureRaw = temperatureRaw << 8 | Wire.read();
-	temperatureRaw = temperatureRaw << 8 | Wire.read();
-	humidityRaw = humidityRaw << 8 | Wire.read();
-	humidityRaw = humidityRaw << 8 | Wire.read();
+	_wire->beginTransmission(_address);
+	_wire->write(0x00);
+	_wire->endTransmission();
+
+}
+
+void HDC1080JS::readTempHumid(){
+	// delay(15);
+	// maybe misses data for first readout if init not called
+	_wire->requestFrom(_address, 4);
+	temperatureRaw = temperatureRaw << 8 | _wire->read();
+	temperatureRaw = temperatureRaw << 8 | _wire->read();
+	humidityRaw = humidityRaw << 8 | _wire->read();
+	humidityRaw = humidityRaw << 8 | _wire->read();
 
 }
 
