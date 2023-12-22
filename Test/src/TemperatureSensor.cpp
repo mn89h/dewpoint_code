@@ -11,6 +11,8 @@ bool TemperatureSensor::init() {
     if (sensorType == typeid(AS6221)) return (*(AS6221*)sensorPtr).init();
     if (sensorType == typeid(Si7051)) return (*(Si7051*)sensorPtr).init();
     if (sensorType == typeid(TMP117)) return (*(TMP117*)sensorPtr).init();
+    if (sensorType == typeid(HDC1080JS)) return (*(HDC1080JS*)sensorPtr).init();
+    if (sensorType == typeid(SHT31)) return (*(SHT31*)sensorPtr).init();
     return false;
 }
 
@@ -20,6 +22,8 @@ float TemperatureSensor::readValue(bool writeToSerial) {
     if (sensorType == typeid(AS6221)) return readValue(*(AS6221*)sensorPtr, writeToSerial);
     if (sensorType == typeid(Si7051)) return readValue(*(Si7051*)sensorPtr, writeToSerial);
     if (sensorType == typeid(TMP117)) return readValue(*(TMP117*)sensorPtr, writeToSerial);
+    if (sensorType == typeid(HDC1080JS)) return readValue(*(HDC1080JS*)sensorPtr, writeToSerial);
+    if (sensorType == typeid(SHT31)) return readValue(*(SHT31*)sensorPtr, writeToSerial);
     return __FLT_MAX__;
 }
 
@@ -97,6 +101,36 @@ float TemperatureSensor::readValue(TMP117 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     reading.value = sensor.readTemperature();
+
+    if (writeToSerial) {
+        writeInfoToSerial();
+        Serial.write(reading.raw, 4);
+    }
+    return reading.value;
+}
+float TemperatureSensor::readValue(HDC1080JS &sensor, bool writeToSerial)
+{
+    binaryFloat reading;
+    // data is ready only 15ms after that command
+    // -> readout from previous sampling
+    sensor.readTempHumid();
+    reading.value = sensor.getTemp();
+    sensor.requestMeas();
+
+    if (writeToSerial) {
+        writeInfoToSerial();
+        Serial.write(reading.raw, 4);
+    }
+    return reading.value;
+}
+float TemperatureSensor::readValue(SHT31 &sensor, bool writeToSerial)
+{
+    binaryFloat reading;
+    // data is ready only 15ms after that command
+    // -> readout from previous sampling
+    sensor.readData();
+    reading.value = sensor.getTemperature(); 
+    sensor.requestData();
 
     if (writeToSerial) {
         writeInfoToSerial();

@@ -3,6 +3,8 @@
 #include "AS6221.h"
 #include "Si7051.h"
 #include "TMP117.h"
+#include "HDC1080JS.h"
+#include "SHT31.h"
 
 typedef union {
   float value;
@@ -41,5 +43,7 @@ class TemperatureSensor {
 		float readValue(AS6221& sensor, bool writeToSerial);
 		float readValue(Si7051& sensor, bool writeToSerial);
 		float readValue(TMP117& sensor, bool writeToSerial);
+		float readValue(HDC1080JS& sensor, bool writeToSerial);
+		float readValue(SHT31& sensor, bool writeToSerial);
 };
 
