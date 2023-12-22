@@ -26,7 +26,7 @@
 #define SHT31_HEATER_TIMEOUT    180000UL   //  milliseconds
 
 
-SHT31::SHT31(uint8_t address, TwoWire *wire)
+SHT31::SHT31(TwoWire *wire, uint8_t address)
 {
   _wire           = wire;
   _address        = address;
@@ -41,13 +41,15 @@ SHT31::SHT31(uint8_t address, TwoWire *wire)
 }
 
 
-bool SHT31::begin()
+bool SHT31::init()
 {
   if ((_address != 0x44) && (_address != 0x45))
   {
     return false;
   }
-  return reset();
+  bool returnVal = reset();
+  requestData();
+  return returnVal;
 }
 
 

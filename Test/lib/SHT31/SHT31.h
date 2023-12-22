@@ -44,9 +44,9 @@
 class SHT31
 {
 public:
-  SHT31(uint8_t address = SHT_DEFAULT_ADDRESS, TwoWire *wire = &Wire);
+  SHT31(TwoWire *wire = &Wire, uint8_t address = SHT_DEFAULT_ADDRESS);
 
-  bool    begin();
+  bool    init();
   uint8_t getAddress();
 
   //  check sensor is reachable over I2C
