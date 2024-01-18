@@ -67,4 +67,5 @@ def process_csv(input_file, output_file):
         writer.writerows(processed_data)
 
 # Replace 'input.csv' and 'output.csv' with your file paths
-process_csv('measurements_20231219-132114_output.csv', 'output3.csv')
+filename = "measurements_20231222-150942"
+process_csv(filename + '.csv', filename + '_processed.csv')

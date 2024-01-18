@@ -82,6 +82,7 @@ inst = rm.open_resource('GPIB0::1::INSTR')
 # inst.query('*RST')
 sleep(1)
 # Measurement mode
+inst.query('END ALWAYS')
 inst.query('OHMF')
 
 # (RE)START
