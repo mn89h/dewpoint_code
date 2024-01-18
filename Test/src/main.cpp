@@ -9,9 +9,12 @@
 
 #include "TemperatureSensor.h"
 #include "VCNL4040.hpp"
+#include "VCNL36825T.hpp"
+#include "tools.h"
 
 std::list<std::unique_ptr<TemperatureSensor>> temp_sensors;
-std::unique_ptr<VCNL4040> light_sensor;
+std::unique_ptr<VCNL4040> light_sensor1;
+std::unique_ptr<VCNL36825T> light_sensor2;
 bool readTemperature;
 bool readLight;
 int readTemperatureSamples;
@@ -88,11 +91,27 @@ void toggleTempSensor(SerialCommands* sender) {
   }
 }
 
+void toggleTempSensorAll(SerialCommands* sender) {
+	char* offOn_str = sender->Next();
+	if (offOn_str == NULL) {
+		sender->GetSerial()->println("ERROR NO_ONOFF");
+		return;
+	}
+  int offOn = atoi(offOn_str);
+
+  for (auto &&sensor : temp_sensors) {
+    if(offOn == 0)      sensor->disable();
+    else if(offOn == 1) sensor->enable();
+    else                sender->GetSerial()->println("ERROR WRONG_ONOFF");
+  }
+}
+
 char serial_command_buffer_[48];
 SerialCommands serial_commands_(&Serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\r\n", " ");
 
 SerialCommand cmd_listTempSensors("LIST_TEMP_SENSORS", enumerate);
 SerialCommand cmd_toggleTempSensor("TOGGLE_TEMP_SENSOR", toggleTempSensor);
+SerialCommand cmd_toggleTempSensorAll("TOGGLE_TEMP_SENSOR_ALL", toggleTempSensorAll);
 SerialCommand cmd_readTemperature_on("READ_TEMP_ON", readTemperature_on);
 SerialCommand cmd_readTemperature_off("READ_TEMP_OFF", readTemperature_off);
 SerialCommand cmd_readTemperature_samples("READ_TEMP_SAMPLES", readTemperature_setSamples);
@@ -106,12 +125,18 @@ SerialCommand cmd_reset("RESET", reset);
 #define ADT7422_ADDR    0x48
 #define AS6221_ADDR     0x49
 
-// TwoWire i2c_flex1 = TwoWire(PC9, PC8);
-// TwoWire i2c_flex2 = TwoWire(PB9, PB8);
-// TwoWire i2c_rigid = TwoWire(PA8, PA9);
-TwoWire i2c_rigid = TwoWire(PC9, PC8);
-TwoWire i2c_flex1 = TwoWire(PA8, PA9);
+#define I2CSWITCH_ADDR      0x70
+#define CHANNEL_VCNL36825T  0x01  // CH0
+#define CHANNEL_VCNL4040    0x02  // CH1
+
+
+TwoWire i2c_flex1 = TwoWire(PC9, PC8);
 TwoWire i2c_flex2 = TwoWire(PB9, PB8);
+TwoWire i2c_rigid = TwoWire(PA8, PA9);
+// TwoWire i2c_rigid = TwoWire(PC9, PC8); //I2C3
+// TwoWire i2c_flex1 = TwoWire(PA8, PA9); //I2C2
+// TwoWire i2c_flex2 = TwoWire(PB9, PB8); //I2C1
+// TwoWire i2c_temp = TwoWire(PA14, PA13); //I2C1
 
 
 void setup() {
@@ -131,6 +156,7 @@ void setup() {
   serial_commands_.AddCommand(&cmd_readLight_off);
   serial_commands_.AddCommand(&cmd_listTempSensors);
   serial_commands_.AddCommand(&cmd_toggleTempSensor);
+  serial_commands_.AddCommand(&cmd_toggleTempSensorAll);
   serial_commands_.AddCommand(&cmd_reset);
 
 
@@ -153,30 +179,43 @@ void setup() {
   temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new Si7051(&i2c_flex1, SI7051_ADDR), typeid(Si7051), "J1:Si7051", 4, true));
   temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new AS6221(&i2c_flex1, AS6221_ADDR), typeid(AS6221), "J1:AS6221", 5, true));
   temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new ADT7422(&i2c_flex1, ADT7422_ADDR), typeid(ADT7422), "J1:ADT7422", 6, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new HDC1080JS(&i2c_rigid, 0x40), typeid(HDC1080JS), "EX:HDC1080JS", 7, true));
+  temp_sensors.push_back(std::make_unique<TemperatureSensor>((void*) new SHT31(&i2c_rigid, 0x44), typeid(SHT31), "EX:SHT31", 8, true));
 
   for (auto &&sensor : temp_sensors){
     sensor->init();
   }
 
+  // uint8_t i2cswitch_select = CHANNEL_VCNL36825T;
+  // I2CTools::writeBytes(&i2c_rigid, I2CSWITCH_ADDR, &i2cswitch_select, 1);
+  
+  // delay(100);
+
   while(!Serial.available()) {}
-  light_sensor = std::make_unique<VCNL4040>(&i2c_rigid, (uint8_t)0x60); 
-  i2c_rigid.beginTransmission(0x70);
-  i2c_rigid.write(0x02);
-  i2c_rigid.endTransmission();
-  i2c_rigid.requestFrom(0x70, 2);
+  I2CTools::portScan(&i2c_rigid, 0x30, 0x70);
 
-  light_sensor->init();
-  light_sensor->setProximityLEDCurrent(VCNL4040_LEDCurrent::LED_CURRENT_200MA);
-  light_sensor->setProximityIntegrationTime(VCNL4040_ProximityIntegration::PROXIMITY_INTEGRATION_TIME_8T);
+  light_sensor2 = std::make_unique<VCNL36825T>(&i2c_rigid, (uint8_t)0x60); 
+  light_sensor2->init();
 
-  i2c_rigid.beginTransmission(0x60);
-  i2c_rigid.write(0x03);
-  i2c_rigid.endTransmission(false);
-  i2c_rigid.requestFrom(0x60, 2);
-  uint8_t lower = i2c_rigid.read();
-  uint8_t higher = i2c_rigid.read();
-  Serial.println(lower);
-  Serial.println(higher);
+  // // light_sensor1 testing
+  // light_sensor1 = std::make_unique<VCNL4040>(&i2c_rigid, (uint8_t)0x60); 
+  // light_sensor1->init();
+  // light_sensor1->setProximityLEDCurrent(VCNL4040_LEDCurrent::LED_CURRENT_200MA);
+  // light_sensor1->setProximityIntegrationTime(VCNL4040_ProximityIntegration::PROXIMITY_INTEGRATION_TIME_8T);
+
+  // // EXTERNAL LED CONTROL
+  // uint32_t dac_val = 0;
+  // while (true)
+  // {
+  //   dac_write_value(PA_4, dac_val, 1);
+  //   Serial.println(dac_val);
+  //   dac_val += 10;
+  //   if(dac_val == 120){
+  //     dac_val = 0;
+  //   }
+  //   delay(5000);
+  // }
+  
 }
 
 /************************* Infinite Loop Function **********************************/
@@ -194,9 +233,16 @@ void loop() {
     }
   }
   if (readLight) {
-    Serial.println(light_sensor->getProximity());
-    Serial.println(light_sensor->getAmbientLight());
-    // Serial.println(light_sensor->getLux());
+    // Serial.println(light_sensor1->getProximity());
+    // Serial.println(light_sensor1->getAmbientLight());
+    // Serial.println(light_sensor1->getLux());
+    Serial.println(light_sensor2->getProximity());
+    for (auto &&sensor : temp_sensors){
+      if(sensor->getStatus()) {
+        Serial.println(sensor->readValue(false));
+      }
+    }
   }
+  // delay(250);
   delay(50);
 }
