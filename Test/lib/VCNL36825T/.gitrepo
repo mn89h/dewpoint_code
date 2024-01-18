@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/adafruit/Adafruit_VCNL4040.git
+	branch = master
+	commit = d1088e5f1b1472b1435c9135c57de271b2aa8c39
+	parent = e2cd9b19051a84ed03540bc0346ba78d94e71bc7
+	method = merge
+	cmdver = 0.4.6
