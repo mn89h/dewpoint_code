@@ -17,6 +17,7 @@ bool Sensor::init() {
     if (sensorType == typeid(SHT31)) return (*(SHT31*)sensorPtr).init();
     if (sensorType == typeid(VCNL36825T)) return (*(VCNL36825T*)sensorPtr).init();
     if (sensorType == typeid(VCNL4040)) return (*(VCNL4040*)sensorPtr).init();
+    if (sensorType == typeid(CapacitorReadout)) return (*(CapacitorReadout*)sensorPtr).init();
     return false;
 }
 
@@ -31,6 +32,7 @@ float Sensor::readValue(bool writeToSerial, DataType type) {
     if (sensorType == typeid(SHT31)) return readValue(*(SHT31*)sensorPtr, writeToSerial);
     if (sensorType == typeid(VCNL36825T)) return readValue(*(VCNL36825T*)sensorPtr, writeToSerial);
     if (sensorType == typeid(VCNL4040)) return readValue(*(VCNL4040*)sensorPtr, writeToSerial);
+    if (sensorType == typeid(CapacitorReadout)) return readValue(*(CapacitorReadout*)sensorPtr, writeToSerial);
     return __FLT_MAX__;
 }
 
@@ -150,7 +152,7 @@ float Sensor::readValue(SHT31 &sensor, bool writeToSerial)
 float Sensor::readValue(VCNL36825T &sensor, bool writeToSerial)
 {
     binaryFloat reading;
-    reading.value = sensor.getProximity();
+    reading.value = (float) sensor.getProximity();
 
     if (writeToSerial) {
         writeInfoToSerial();
@@ -161,7 +163,18 @@ float Sensor::readValue(VCNL36825T &sensor, bool writeToSerial)
 float Sensor::readValue(VCNL4040 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
-    reading.value = sensor.getProximity();
+    reading.value = (float) sensor.getProximity();
+
+    if (writeToSerial) {
+        writeInfoToSerial();
+        Serial.write(reading.raw, 4);
+    }
+    return reading.value;
+}
+float Sensor::readValue(CapacitorReadout &sensor, bool writeToSerial)
+{
+    binaryFloat reading;
+    reading.value = (float) sensor.getFrequency();
 
     if (writeToSerial) {
         writeInfoToSerial();

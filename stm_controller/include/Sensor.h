@@ -7,6 +7,7 @@
 #include "SHT31.h"
 #include "VCNL36825T.hpp"
 #include "VCNL4040.hpp"
+#include "CapacitorReadout.h"
 
 
 #include "tools.h"
@@ -37,7 +38,7 @@ class Sensor {
       PROX,
       DFLT
     };
-    Sensor(void* sensor, const std::type_info& type, const String& friendlyName, uint8_t sensorCat, uint8_t sensorId, TwoWire* wire = &Wire, uint8_t i2c_switchAddress, int i2c_channel = -1, bool inUse = true);
+    Sensor(void* sensor, const std::type_info& type, const String& friendlyName, uint8_t sensorCat, uint8_t sensorId, TwoWire* wire = &Wire, uint8_t i2c_switchAddress = 0x70, int i2c_channel = -1, bool inUse = true);
 
     bool init();
     float readValue(bool writeToSerial = true, DataType type = DataType::DFLT);
@@ -68,5 +69,6 @@ class Sensor {
 		float readValue(SHT31& sensor, bool writeToSerial);
 		float readValue(VCNL36825T& sensor, bool writeToSerial);
 		float readValue(VCNL4040& sensor, bool writeToSerial);
+		float readValue(CapacitorReadout& sensor, bool writeToSerial);
 };
 

@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#ifndef TOOLS_H
+#define TOOLS_H
+
 class SerialSpeedTest {
     public:
 		SerialSpeedTest(HardwareSerial& serial);
@@ -25,3 +28,5 @@ class I2CTools {
         static void switchScan(TwoWire* wire, int switchAddress, int noChannels = 4, int startAddress = 0x30, int stopAddress = 0x79);
         static void switchSetChannel(TwoWire* wire, int switchAddress, int channel);
 };
+
+#endif
