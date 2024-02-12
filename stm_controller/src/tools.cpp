@@ -34,15 +34,31 @@ void I2CTools::portScan(TwoWire* wire, int startAddress, int stopAddress) {
       if(code == 0){
           Serial.print("Device at 0x");
           Serial.print(i, HEX);
-          Serial.print(", Code: 0");
+          Serial.println(", Code: 0");
       }
       if(code == 4){
           Serial.print("Device at 0x");
           Serial.print(i, HEX);
-          Serial.print(", Code: 4");
+          Serial.println(", Code: 4");
       }
   }
   Serial.println("Finished port scan");
+}
+
+void I2CTools::switchScan(TwoWire* wire, int switchAddress, int noChannels, int startAddress, int stopAddress) {
+  for(int ch = 0; ch < noChannels; ch++){
+    Serial.print("Channel ");
+    Serial.println(ch);
+    
+    I2CTools::switchSetChannel(wire, switchAddress, ch);
+    I2CTools::portScan(wire, startAddress, stopAddress);
+  }
+  Serial.println();
+}
+
+void I2CTools::switchSetChannel(TwoWire* wire, int switchAddress, int channel) {
+  uint8_t channelBitstream = 1 << channel;
+  I2CTools::writeBytes(wire, switchAddress, &channelBitstream, 1);
 }
 
 /// @brief Writes bytes to an I2C device. Pass an array with the data

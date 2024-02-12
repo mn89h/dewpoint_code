@@ -1,33 +1,40 @@
 #include <Arduino.h>
-#include "TemperatureSensor.h"
+#include "Sensor.h"
 
-TemperatureSensor::TemperatureSensor(void* sensor, const std::type_info& sensorType, const String &friendlyName, int sensorId, bool inUse) :
-    sensorPtr(sensor), sensorType(sensorType), friendlyName(friendlyName), sensorId(sensorId), inUse(inUse)
+Sensor::Sensor(void* sensor, const std::type_info& sensorType, const String &friendlyName, uint8_t sensorCat, uint8_t sensorId, TwoWire* wire, uint8_t i2c_switchAddress, int i2c_channel, bool inUse) :
+    sensorPtr(sensor), sensorType(sensorType), friendlyName(friendlyName), sensorCat(sensorCat), sensorId(sensorId), wire(wire), i2c_switchAddress(i2c_switchAddress), i2c_channel(i2c_channel), inUse(inUse)
 {
 }
 
-bool TemperatureSensor::init() {
+bool Sensor::init() {
+    if (i2c_channel != -1) I2CTools::switchSetChannel(wire, i2c_switchAddress, i2c_channel);
     if (sensorType == typeid(ADT7422)) return (*(ADT7422*)sensorPtr).init();
     if (sensorType == typeid(AS6221)) return (*(AS6221*)sensorPtr).init();
     if (sensorType == typeid(Si7051)) return (*(Si7051*)sensorPtr).init();
     if (sensorType == typeid(TMP117)) return (*(TMP117*)sensorPtr).init();
     if (sensorType == typeid(HDC1080JS)) return (*(HDC1080JS*)sensorPtr).init();
     if (sensorType == typeid(SHT31)) return (*(SHT31*)sensorPtr).init();
+    if (sensorType == typeid(SHT31)) return (*(SHT31*)sensorPtr).init();
+    if (sensorType == typeid(VCNL36825T)) return (*(VCNL36825T*)sensorPtr).init();
+    if (sensorType == typeid(VCNL4040)) return (*(VCNL4040*)sensorPtr).init();
     return false;
 }
 
-float TemperatureSensor::readValue(bool writeToSerial) {
+float Sensor::readValue(bool writeToSerial, DataType type) {
     if (!inUse) return __FLT_MAX__;
+    if (i2c_channel != -1) I2CTools::switchSetChannel(wire, i2c_switchAddress, i2c_channel);
     if (sensorType == typeid(ADT7422)) return readValue(*(ADT7422*)sensorPtr, writeToSerial);
     if (sensorType == typeid(AS6221)) return readValue(*(AS6221*)sensorPtr, writeToSerial);
     if (sensorType == typeid(Si7051)) return readValue(*(Si7051*)sensorPtr, writeToSerial);
     if (sensorType == typeid(TMP117)) return readValue(*(TMP117*)sensorPtr, writeToSerial);
     if (sensorType == typeid(HDC1080JS)) return readValue(*(HDC1080JS*)sensorPtr, writeToSerial);
     if (sensorType == typeid(SHT31)) return readValue(*(SHT31*)sensorPtr, writeToSerial);
+    if (sensorType == typeid(VCNL36825T)) return readValue(*(VCNL36825T*)sensorPtr, writeToSerial);
+    if (sensorType == typeid(VCNL4040)) return readValue(*(VCNL4040*)sensorPtr, writeToSerial);
     return __FLT_MAX__;
 }
 
-void TemperatureSensor::printInfo(){
+void Sensor::printInfo(){
     Serial.print("ID: ");
     Serial.print(sensorId);
     Serial.print(", NAME: ");
@@ -37,34 +44,36 @@ void TemperatureSensor::printInfo(){
     else        Serial.println("0");
 }
 
-void TemperatureSensor::enable(){
+void Sensor::enable(){
     inUse = true;
 }
 
-void TemperatureSensor::disable(){
+void Sensor::disable(){
     inUse = false;
 }
 
-int TemperatureSensor::getSensorId() {
+uint8_t Sensor::getSensorCat() {
+    return sensorCat;
+}
+
+uint8_t Sensor::getSensorId() {
     return sensorId;
 }
 
-bool TemperatureSensor::getStatus(){
+bool Sensor::getStatus(){
     return inUse;
 }
 
-void TemperatureSensor::writeInfoToSerial(){
-    binaryUInt id;
-    id.value = sensorId;
-    
+void Sensor::writeInfoToSerial(){    
     binaryUInt time;
     time.value = millis();
 
-    Serial.write(id.raw, 4);
+    Serial.write(&sensorCat, 1);
+    Serial.write(&sensorId, 1);
     Serial.write(time.raw, 4);
 }
 
-float TemperatureSensor::readValue(ADT7422 &sensor, bool writeToSerial)
+float Sensor::readValue(ADT7422 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     reading.value = sensor.readTemperature();
@@ -75,7 +84,7 @@ float TemperatureSensor::readValue(ADT7422 &sensor, bool writeToSerial)
     }
     return reading.value;
 }
-float TemperatureSensor::readValue(AS6221 &sensor, bool writeToSerial)
+float Sensor::readValue(AS6221 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     reading.value = sensor.readTemperature();
@@ -86,7 +95,7 @@ float TemperatureSensor::readValue(AS6221 &sensor, bool writeToSerial)
     }
     return reading.value;
 }
-float TemperatureSensor::readValue(Si7051 &sensor, bool writeToSerial)
+float Sensor::readValue(Si7051 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     reading.value = sensor.readTemperature();
@@ -97,7 +106,7 @@ float TemperatureSensor::readValue(Si7051 &sensor, bool writeToSerial)
     }
     return reading.value;
 }
-float TemperatureSensor::readValue(TMP117 &sensor, bool writeToSerial)
+float Sensor::readValue(TMP117 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     reading.value = sensor.readTemperature();
@@ -108,7 +117,7 @@ float TemperatureSensor::readValue(TMP117 &sensor, bool writeToSerial)
     }
     return reading.value;
 }
-float TemperatureSensor::readValue(HDC1080JS &sensor, bool writeToSerial)
+float Sensor::readValue(HDC1080JS &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     // data is ready only 15ms after that command
@@ -123,7 +132,7 @@ float TemperatureSensor::readValue(HDC1080JS &sensor, bool writeToSerial)
     }
     return reading.value;
 }
-float TemperatureSensor::readValue(SHT31 &sensor, bool writeToSerial)
+float Sensor::readValue(SHT31 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     // data is ready only 15ms after that command
@@ -131,6 +140,28 @@ float TemperatureSensor::readValue(SHT31 &sensor, bool writeToSerial)
     sensor.readData();
     reading.value = sensor.getTemperature(); 
     sensor.requestData();
+
+    if (writeToSerial) {
+        writeInfoToSerial();
+        Serial.write(reading.raw, 4);
+    }
+    return reading.value;
+}
+float Sensor::readValue(VCNL36825T &sensor, bool writeToSerial)
+{
+    binaryFloat reading;
+    reading.value = sensor.getProximity();
+
+    if (writeToSerial) {
+        writeInfoToSerial();
+        Serial.write(reading.raw, 4);
+    }
+    return reading.value;
+}
+float Sensor::readValue(VCNL4040 &sensor, bool writeToSerial)
+{
+    binaryFloat reading;
+    reading.value = sensor.getProximity();
 
     if (writeToSerial) {
         writeInfoToSerial();

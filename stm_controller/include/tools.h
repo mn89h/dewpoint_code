@@ -22,4 +22,6 @@ class I2CTools {
         static void portScan(TwoWire* wire, int startAddress, int stopAddress);
         static void writeBytes(TwoWire* wire, uint8_t device, const uint8_t* writeBuf, int numBytes, bool repeatedStart = false);
         static void readBytes(TwoWire* wire, uint8_t device, int numBytes);
+        static void switchScan(TwoWire* wire, int switchAddress, int noChannels = 4, int startAddress = 0x30, int stopAddress = 0x79);
+        static void switchSetChannel(TwoWire* wire, int switchAddress, int channel);
 };
