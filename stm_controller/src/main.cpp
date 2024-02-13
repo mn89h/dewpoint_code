@@ -10,6 +10,7 @@
 #include "Sensor.h"
 #include "VCNL4040.hpp"
 #include "VCNL36825T.hpp"
+#include "SHT4X.h"
 #include "tools.h"
 #include "PeltierController.h"
 
@@ -221,37 +222,123 @@ void setup() {
 
   //TODO: PROX Sensor turn off, HUM/AMB sensors, peltier/heater pwm
 
-  uint32_t period_start = millis();
+  SHT4X sht(&i2c_flex1);
+  bool unodos = true;
+  while (true) {
+    if(unodos)  I2CTools::switchSetChannel(&i2c_flex1, I2CSWITCH_ADDR, 0);
+    if(!unodos) I2CTools::switchSetChannel(&i2c_flex1, I2CSWITCH_ADDR, 2);
+    Serial.print("SHT45 ");
+    bool res = sht.requestMeas();
+    float temp = sht.getTemperature();
+    float hum = sht.getHumidity();
+    Serial.print(res + (String)" ");
+    Serial.print(temp + (String)" ");
+    Serial.println(hum);
+    unodos = !unodos;
+    delay(500);
+  }
+
+  #define periodMS 200
+  #define periodS 0.200
+  float limit = 200.0;
+  float t_target = 5.0;
+  float deltaTperS = -0.3;
+  float deltaTperPeriod = deltaTperS * periodS;
+  float t_next = sensors.front()->readValue(false);
+  float t_actual = 0;
+  uint8_t numReadings = 0;
+  float error = 0;
+
+  float Ki = 50;
+  float pwm_factor = 0.0;
+
+  float proximity;
+  float capacitance;
+  bool falling = true;
+
   while(true) {
-    for (auto &&sensor : sensors){
-      if (sensor->getStatus()) {
-        if (sensor->getSensorCat() == SENSOR_TEMP) {
-          Serial.print("TEMP");
-        }
-        if (sensor->getSensorCat() == SENSOR_PROX) {
-          Serial.print("PROX");
-        }
-        if (sensor->getSensorCat() == SENSOR_CAP) {
-          Serial.print("CAPF");
-        }
-        Serial.print(sensor->getSensorId());
-        Serial.print(": ");
-        Serial.println(sensor->readValue(false));
-      }
+    uint32_t period_start = millis();
+    t_next = t_next + deltaTperPeriod;
+    if (falling && t_next < t_target) {
+      falling = false;
+      t_target = 20.0;
+      deltaTperS = 0.1;
+      deltaTperPeriod = deltaTperS * periodS;
     }
-    uint32_t period_end = millis();
-    uint32_t elapsed = period_end - period_start;
-    if(elapsed > 1000){
-      analogWrite(PB4, 32); // 32 means 12.5%
-    }
-    if(elapsed > 40000){
-      analogWrite(PB4, 0);
-    }
-    if(elapsed > 80000) {
+    else if (!falling && t_next > t_target) {
       break;
     }
-    delay(200);
+    
+    t_actual = 0;
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus() && sensor->getSensorCat() == SENSOR_TEMP) {
+        t_actual += sensor->readValue(false);
+        numReadings++;
+      }
+    }
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        if (sensor->getSensorCat() == SENSOR_PROX) {
+          proximity = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_CAP) {
+          capacitance = sensor->readValue(false);
+        }
+      }
+    }
+    t_actual = t_actual / numReadings;
+    numReadings = 0;
+
+    error = t_next - t_actual;
+    pwm_factor = - (error * Ki);
+    if (pwm_factor > limit) pwm_factor = 200;
+    else if (pwm_factor < 0) pwm_factor = 0;
+
+    Serial.print(t_actual + (String)" " + t_next + (String)" " + (uint8_t)pwm_factor + (String)" " + proximity + (String)" " + capacitance);
+    Serial.println();
+    analogWrite(PB4, (uint8_t)pwm_factor);
+    uint32_t period_end = millis();
+    uint32_t elapsed = period_end - period_start;
+    if (elapsed < periodMS) {
+      delay(periodMS - elapsed);
+    }
+    else {
+      Serial.println((String)"TIMING: " + elapsed);
+    }
   }
+  analogWrite(PB4, 0);
+
+  // uint32_t period_start = millis();
+  // while(true) {
+  //   for (auto &&sensor : sensors){
+  //     if (sensor->getStatus()) {
+  //       if (sensor->getSensorCat() == SENSOR_TEMP) {
+  //         Serial.print("TEMP");
+  //       }
+  //       if (sensor->getSensorCat() == SENSOR_PROX) {
+  //         Serial.print("PROX");
+  //       }
+  //       if (sensor->getSensorCat() == SENSOR_CAP) {
+  //         Serial.print("CAPF");
+  //       }
+  //       Serial.print(sensor->getSensorId());
+  //       Serial.print(": ");
+  //       Serial.println(sensor->readValue(false));
+  //     }
+  //   }
+  //   uint32_t period_end = millis();
+  //   uint32_t elapsed = period_end - period_start;
+  //   if(elapsed > 1000){
+  //     analogWrite(PB4, 32); // 32 means 12.5%
+  //   }
+  //   if(elapsed > 40000){
+  //     analogWrite(PB4, 0);
+  //   }
+  //   if(elapsed > 80000) {
+  //     break;
+  //   }
+  //   delay(200);
+  // }
 
 
   // delay(10);

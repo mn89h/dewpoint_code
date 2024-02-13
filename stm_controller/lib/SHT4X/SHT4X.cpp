@@ -35,7 +35,7 @@ static uint8_t crc8(const uint8_t *data, int len);
  * @brief  SHT4X constructor
  */
 SHT4X::SHT4X(TwoWire *wire) :
-  i2c_dev(wire)
+  wire(wire)
 {
 }
 
@@ -61,11 +61,11 @@ uint32_t SHT4X::readSerial(void) {
   uint8_t cmd = SHT4X_READSERIAL;
   uint8_t reply[6];
 
-  if (!i2c_dev->write(&cmd, 1)) {
+  if (!writeCmd(cmd)) {
     return false;
   }
   delay(10);
-  if (!i2c_dev->read(reply, 6)) {
+  if (readBytes(reply, 6)) {
     return false;
   }
 
@@ -91,7 +91,7 @@ uint32_t SHT4X::readSerial(void) {
  */
 bool SHT4X::reset(void) {
   uint8_t cmd = SHT4X_SOFTRESET;
-  if (!i2c_dev->write(&cmd, 1)) {
+  if (!writeCmd(cmd)) {
     return false;
   }
   delay(1);
@@ -141,8 +141,7 @@ sht4x_heater_t SHT4X::getHeater(void) { return _heater; }
     @returns true if the event data was read successfully
 */
 /**************************************************************************/
-bool SHT4X::getEvent(sensors_event_t *humidity,
-                              sensors_event_t *temp) {
+bool SHT4X::requestMeas() {
   uint32_t t = millis();
 
   uint8_t readbuffer[6];
@@ -191,14 +190,13 @@ bool SHT4X::getEvent(sensors_event_t *humidity,
     duration = 110;
   }
 
-  if (!i2c_dev->write(&cmd, 1)) {
+  if (!writeCmd(cmd)) {
     return false;
   }
   delay(duration);
-  if (!i2c_dev->read(readbuffer, 6)) {
+  if (!readBytes(readbuffer, 6)) {
     return false;
   }
-
   if (readbuffer[2] != crc8(readbuffer, 2) ||
       readbuffer[5] != crc8(readbuffer + 3, 2))
     return false;
@@ -210,138 +208,15 @@ bool SHT4X::getEvent(sensors_event_t *humidity,
 
   _humidity = min(max(_humidity, (float)0.0), (float)100.0);
 
-  // use helpers to fill in the events
-  if (temp)
-    fillTempEvent(temp, t);
-  if (humidity)
-    fillHumidityEvent(humidity, t);
   return true;
 }
 
-void SHT4X::fillTempEvent(sensors_event_t *temp, uint32_t timestamp) {
-  memset(temp, 0, sizeof(sensors_event_t));
-  temp->version = sizeof(sensors_event_t);
-  temp->sensor_id = _sensorid_temp;
-  temp->type = SENSOR_TYPE_AMBIENT_TEMPERATURE;
-  temp->timestamp = timestamp;
-  temp->temperature = _temperature;
+float SHT4X::getTemperature() {
+  return _temperature;
 }
 
-void SHT4X::fillHumidityEvent(sensors_event_t *humidity,
-                                       uint32_t timestamp) {
-  memset(humidity, 0, sizeof(sensors_event_t));
-  humidity->version = sizeof(sensors_event_t);
-  humidity->sensor_id = _sensorid_humidity;
-  humidity->type = SENSOR_TYPE_RELATIVE_HUMIDITY;
-  humidity->timestamp = timestamp;
-  humidity->relative_humidity = _humidity;
-}
-
-/**
- * @brief Gets the Adafruit_Sensor object for the SHT4X's humidity sensor
- *
- * @return Adafruit_Sensor*
- */
-Adafruit_Sensor *SHT4X::getHumiditySensor(void) {
-  return humidity_sensor;
-}
-
-/**
- * @brief Gets the Adafruit_Sensor object for the SHT4X's temperature sensor
- *
- * @return Adafruit_Sensor*
- */
-Adafruit_Sensor *SHT4X::getTemperatureSensor(void) {
-  return temp_sensor;
-}
-/**
- * @brief  Gets the sensor_t object describing the SHT4X's humidity sensor
- *
- * @param sensor The sensor_t object to be populated
- */
-void SHT4X_Humidity::getSensor(sensor_t *sensor) {
-  /* Clear the sensor_t object */
-  memset(sensor, 0, sizeof(sensor_t));
-
-  /* Insert the sensor name in the fixed length char array */
-  strncpy(sensor->name, "SHT4X_H", sizeof(sensor->name) - 1);
-  sensor->name[sizeof(sensor->name) - 1] = 0;
-  sensor->version = 1;
-  sensor->sensor_id = _sensorID;
-  sensor->type = SENSOR_TYPE_RELATIVE_HUMIDITY;
-  sensor->min_delay = 0;
-  sensor->min_value = 0;
-  sensor->max_value = 100;
-  sensor->resolution = 2;
-}
-/**
-    @brief  Gets the humidity as a standard sensor event
-    @param  event Sensor event object that will be populated
-    @returns True
- */
-bool SHT4X_Humidity::getEvent(sensors_event_t *event) {
-  _theSHT4X->getEvent(event, NULL);
-
-  return true;
-}
-/**
- * @brief  Gets the sensor_t object describing the SHT4X's tenperature sensor
- *
- * @param sensor The sensor_t object to be populated
- */
-void SHT4X_Temp::getSensor(sensor_t *sensor) {
-  /* Clear the sensor_t object */
-  memset(sensor, 0, sizeof(sensor_t));
-
-  /* Insert the sensor name in the fixed length char array */
-  strncpy(sensor->name, "SHT4X_T", sizeof(sensor->name) - 1);
-  sensor->name[sizeof(sensor->name) - 1] = 0;
-  sensor->version = 1;
-  sensor->sensor_id = _sensorID;
-  sensor->type = SENSOR_TYPE_AMBIENT_TEMPERATURE;
-  sensor->min_delay = 0;
-  sensor->min_value = -40;
-  sensor->max_value = 85;
-  sensor->resolution = 0.3; // depends on calibration data?
-}
-/*!
-    @brief  Gets the temperature as a standard sensor event
-    @param  event Sensor event object that will be populated
-    @returns true
-*/
-bool SHT4X_Temp::getEvent(sensors_event_t *event) {
-  _theSHT4X->getEvent(NULL, event);
-
-  return true;
-}
-
-/**
- * Internal function to perform an I2C write.
- *
- * @param cmd   The 16-bit command ID to send.
- */
-bool SHT4X::writeCommand(uint16_t command) {
-  uint8_t cmd[2];
-
-  cmd[0] = command >> 8;
-  cmd[1] = command & 0xFF;
-
-  return i2c_dev->write(cmd, 2);
-}
-
-/**
- * Internal function to perform an I2C read.
- *
- * @param cmd   The 16-bit command ID to send.
- */
-bool SHT4X::readCommand(uint16_t command, uint8_t *buffer,
-                                 uint8_t num_bytes) {
-  uint8_t cmd[2];
-
-  cmd[0] = command >> 8;
-  cmd[1] = command & 0xFF;
-
-  return i2c_dev->write_then_read(cmd, 2, buffer, num_bytes);
+float SHT4X::getHumidity() {
+  return _humidity;
 }
 
 /**
@@ -375,4 +250,30 @@ static uint8_t crc8(const uint8_t *data, int len) {
     }
   }
   return crc;
+}
+
+
+bool SHT4X::readBytes(uint8_t *val, uint8_t n)
+{
+  int rv = wire->requestFrom(SHT4X_DEFAULT_ADDR, (uint8_t) n);
+  if (rv == n)
+  {
+    for (uint8_t i = 0; i < n; i++)
+    {
+      val[i] = wire->read();
+    }
+    return true;
+  }
+  return false;
+}
+
+bool SHT4X::writeCmd(uint8_t cmd)
+{
+  wire->beginTransmission(SHT4X_DEFAULT_ADDR);
+  wire->write(cmd);
+  if (wire->endTransmission() != 0)
+  {
+    return false;
+  }
+  return true;
 }

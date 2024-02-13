@@ -73,6 +73,9 @@ public:
   SHT4X(TwoWire* wire);
 
   bool init();
+  bool requestMeas();
+  float getTemperature();
+  float getHumidity();
   uint32_t readSerial(void);
   bool reset(void);
 
@@ -85,13 +88,13 @@ private:
   float _temperature, ///< Last reading's temperature (C)
       _humidity;      ///< Last reading's humidity (percent)
 
-  TwoWire* i2c_dev = NULL;      ///< Pointer to I2C bus interface
+  TwoWire* wire = NULL;      ///< Pointer to I2C bus interface
 
   sht4x_precision_t _precision = SHT4X_HIGH_PRECISION;
   sht4x_heater_t _heater = SHT4X_NO_HEATER;
 
-  bool writeCommand(uint16_t cmd);
-  bool readCommand(uint16_t command, uint8_t *buffer, uint8_t num_bytes);
+  bool readBytes(uint8_t *val, uint8_t n);
+  bool writeCmd(uint8_t cmd);
 };
 
 #endif
