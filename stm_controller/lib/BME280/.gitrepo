@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/janw-cz/JWA_BME280.git
+	branch = master
+	commit = 0ed642b07dd0df6b433a0e79ee0c4936439a8aaf
+	parent = 1d5cd56e3cb6b6b1f133577c185f2da534b3e828
+	method = merge
+	cmdver = 0.4.6
