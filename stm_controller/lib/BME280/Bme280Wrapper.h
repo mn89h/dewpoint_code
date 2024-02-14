@@ -2,16 +2,21 @@
 #define __BMP280_BW_H__
 
 #include <bme280.h>
+#include <Arduino.h>
+#include <Wire.h>
+#include <SPI.h>
 
-class Bme280BoschWrapper
+#define BME280_I2C_ADDR 0x76
+
+class BME280Wrapper
 {
   public:
     //true: uses forced mode, sensore measures values on demand
     //false: uses continuous measuring mode
-    Bme280BoschWrapper(bool forcedMode);
+    BME280Wrapper(TwoWire* wire);
+    BME280Wrapper(int8_t cspin);
 
-    bool beginI2C(uint8_t dev_addr = 0x77);
-    bool beginSPI(int8_t cspin);
+    bool init(bool forced = false);
 
     //this method performs measurement
     //be sure to call it before reading values
@@ -27,6 +32,8 @@ class Bme280BoschWrapper
     uint32_t getPressure();
 
   private:
+    bool beginI2C();
+    bool beginSPI();
     void I2CInit();
     void SPIInit();
     int8_t setSensorSettings();
@@ -38,11 +45,13 @@ class Bme280BoschWrapper
     static void delayusec(uint32_t period, void *intf_ptr);
 
     static int _cs;
+    static TwoWire* wire;
 
     struct bme280_dev bme280;
     struct bme280_data comp_data;
 
-    bool forced;
+    bool useI2C;
+    bool forced = false;
     bool error = false;
 };
 
