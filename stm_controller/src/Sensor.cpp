@@ -18,6 +18,8 @@ bool Sensor::init() {
     if (sensorType == typeid(VCNL36825T)) return (*(VCNL36825T*)sensorPtr).init();
     if (sensorType == typeid(VCNL4040)) return (*(VCNL4040*)sensorPtr).init();
     if (sensorType == typeid(CapacitorReadout)) return (*(CapacitorReadout*)sensorPtr).init();
+    if (sensorType == typeid(SHT4X)) return (*(SHT4X*)sensorPtr).init();
+    if (sensorType == typeid(BME280Wrapper)) return (*(BME280Wrapper*)sensorPtr).init();
     return false;
 }
 
@@ -33,6 +35,8 @@ float Sensor::readValue(bool writeToSerial, DataType type) {
     if (sensorType == typeid(VCNL36825T)) return readValue(*(VCNL36825T*)sensorPtr, writeToSerial);
     if (sensorType == typeid(VCNL4040)) return readValue(*(VCNL4040*)sensorPtr, writeToSerial);
     if (sensorType == typeid(CapacitorReadout)) return readValue(*(CapacitorReadout*)sensorPtr, writeToSerial);
+    if (sensorType == typeid(SHT4X)) return readValue(*(SHT4X*)sensorPtr, writeToSerial, type);
+    if (sensorType == typeid(BME280Wrapper)) return readValue(*(BME280Wrapper*)sensorPtr, writeToSerial, type);
     return __FLT_MAX__;
 }
 
@@ -175,6 +179,33 @@ float Sensor::readValue(CapacitorReadout &sensor, bool writeToSerial)
 {
     binaryFloat reading;
     reading.value = (float) sensor.getFrequency();
+
+    if (writeToSerial) {
+        writeInfoToSerial();
+        Serial.write(reading.raw, 4);
+    }
+    return reading.value;
+}
+float Sensor::readValue(SHT4X &sensor, bool writeToSerial, DataType type)
+{
+    sensor.requestMeas();
+    binaryFloat reading;
+    reading.value = (float) sensor.getHumidity();
+    if (type == DataType::TEMP) reading.value = (float) sensor.getTemperature();
+
+    if (writeToSerial) {
+        writeInfoToSerial();
+        Serial.write(reading.raw, 4);
+    }
+    return reading.value;
+}
+float Sensor::readValue(BME280Wrapper &sensor, bool writeToSerial, DataType type)
+{
+    sensor.measure();
+    binaryFloat reading;
+    reading.value = (float) sensor.getPressure();
+    if (type == DataType::HUM) reading.value = (float) sensor.getHumidity() / 1024;
+    if (type == DataType::TEMP) reading.value = (float) sensor.getTemperature() / 100; 
 
     if (writeToSerial) {
         writeInfoToSerial();

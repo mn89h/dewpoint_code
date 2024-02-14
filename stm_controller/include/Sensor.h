@@ -8,6 +8,8 @@
 #include "VCNL36825T.hpp"
 #include "VCNL4040.hpp"
 #include "CapacitorReadout.h"
+#include "SHT4X.h"
+#include "Bme280Wrapper.h"
 
 
 #include "tools.h"
@@ -70,5 +72,7 @@ class Sensor {
 		float readValue(VCNL36825T& sensor, bool writeToSerial);
 		float readValue(VCNL4040& sensor, bool writeToSerial);
 		float readValue(CapacitorReadout& sensor, bool writeToSerial);
+		float readValue(SHT4X& sensor, bool writeToSerial, DataType type);
+		float readValue(BME280Wrapper& sensor, bool writeToSerial, DataType type);
 };
 
