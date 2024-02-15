@@ -200,7 +200,7 @@ void setup() {
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL36825T(&i2c_rigid, VCNL36825T_ADDR), typeid(VCNL36825T), "VCNL36825T:CENTER", SENSOR_PROX, 0, &i2c_rigid, I2CSWITCH_ADDR, 0, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL36825T(&i2c_rigid, VCNL36825T_ADDR), typeid(VCNL36825T), "VCNL36825T:BORDER", SENSOR_PROX, 1, &i2c_rigid, I2CSWITCH_ADDR, 1, false));
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:BORDER", SENSOR_PROX, 2, &i2c_rigid, I2CSWITCH_ADDR, 2, false));
-  sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:CENTER", SENSOR_PROX, 3, &i2c_rigid, I2CSWITCH_ADDR, 3, false));
+  sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:CENTER", SENSOR_PROX, 3, &i2c_rigid, I2CSWITCH_ADDR, 3, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new SHT4X(&i2c_flex1), typeid(SHT4X), "SHT45:BORDER", SENSOR_HUM, 0, &i2c_flex1, I2CSWITCH_ADDR, 0, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new SHT4X(&i2c_flex1), typeid(SHT4X), "SHT45:CENTER", SENSOR_HUM, 1, &i2c_flex1, I2CSWITCH_ADDR, 2, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new BME280Wrapper(&i2c_flex1), typeid(BME280Wrapper), "BME280", SENSOR_AMB, 0, &i2c_rigid, I2CSWITCH_ADDR, 2, true));
@@ -210,12 +210,15 @@ void setup() {
       sensor->init();
     }
   }
+  delay(10);
 
-  while(!Serial.available()) {}
   Serial.println("Base PCB I2C Devices");
   I2CTools::switchScan(&i2c_rigid, I2CSWITCH_ADDR, 4);
   Serial.println("Flex PCB I2C Devices");
   I2CTools::switchScan(&i2c_flex1, I2CSWITCH_ADDR, 4);
+
+  while (!Serial.available()) {}
+  Serial.println("initialized");
 
   // while(true){
 
@@ -238,44 +241,6 @@ void setup() {
   //   delay(500);
   // }
 
-  //TODO: PROX Sensor turn off, HUM/AMB sensors, peltier/heater pwm
-
-  // Force PWM off
-  analogWrite(PB4, 0);
-
-  // uint32_t period_start = millis();
-  // while(true) {
-  //   for (auto &&sensor : sensors){
-  //     if (sensor->getStatus()) {
-  //       if (sensor->getSensorCat() == SENSOR_TEMP) {
-  //         Serial.print("TEMP");
-  //       }
-  //       if (sensor->getSensorCat() == SENSOR_PROX) {
-  //         Serial.print("PROX");
-  //       }
-  //       if (sensor->getSensorCat() == SENSOR_CAP) {
-  //         Serial.print("CAPF");
-  //       }
-  //       Serial.print(sensor->getSensorId());
-  //       Serial.print(": ");
-  //       Serial.println(sensor->readValue(false));
-  //     }
-  //   }
-  //   uint32_t period_end = millis();
-  //   uint32_t elapsed = period_end - period_start;
-  //   if(elapsed > 1000){
-  //     analogWrite(PB4, 32); // 32 means 12.5%
-  //   }
-  //   if(elapsed > 40000){
-  //     analogWrite(PB4, 0);
-  //   }
-  //   if(elapsed > 80000) {
-  //     break;
-  //   }
-  //   delay(200);
-  // }
-
-
   // delay(10);
   // peltier = std::make_unique<PeltierController>(PinName(D3), PeltierController::ARDUINOPWM);
   // initial_light_value = (uint16_t) (0.9 * light_sensor2->getProximity());
@@ -296,7 +261,7 @@ void setup() {
   // Serial.println(str);
 }
 
-void routine_main() {
+void routine_fall1rise1() {
   // Selfcheck
   float reading;
   bool self_check_failed = false;
@@ -353,6 +318,9 @@ void routine_main() {
   float integrator = 0.0;
 	float differentiator = 0.0;
 
+  const float T_targets[2] = {10.0, 20.0};
+  const float deltaTperSs[3] = {-0.6, 0, 0.2};
+
   enum State {
     ENTRY,
     STAGE0_DESCEND,
@@ -361,6 +329,15 @@ void routine_main() {
     STAGE1_HOLD
   };
   State state = ENTRY;
+
+  const String info_head = "routine_name duration period PID T hum cap prox T_target(s) dT(s) kp ki kd info";
+  const String info = "main_fall1rise1 - 0.2s x x x x " + 
+                      (String) T_targets[0] + ";" + T_targets[1] + " " +
+                      deltaTperSs[0] + ";" + deltaTperSs[1] + ";" + deltaTperSs[2] + " " +
+                      Kp + " " + Ki + " " + Kd + " " + 
+                      "stability test (slow +dT)";
+  Serial.println(info_head);
+  Serial.println(info);
 
   uint32_t time_checkpoint;
   bool finished = false;
@@ -481,6 +458,72 @@ void routine_main() {
 }
 
 
+void routine_nopid30min() {
+  const uint32_t periodMS = 200;
+  const float periodS = (float) periodMS / 1000; 
+  float T_sensor[4];
+  float T_actual = 0.0;
+  float humidity = 0.0;
+  float capacitance = 0.0;
+  float proximity[4];
+  uint8_t numTempReadings = 0;
+  const uint32_t runduration_ms = 30 * 60 * 1000; // min * s * us
+
+  const String info_head = "routine_name duration period PID T hum cap prox T_target(s) kp ki kd info";
+  const String info = "nopid30min 30min 0.2s - x x x - - - stability test (slow +dT)";
+  Serial.println(info_head);
+  Serial.println(info);
+
+  uint32_t routine_start = millis();
+  uint32_t next_period = routine_start;
+  while(true) {
+    next_period = next_period + 200;
+
+    // read current temperature and sensor values
+    numTempReadings = 0;
+    T_actual = 0;
+    humidity = 0;
+    
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_TEMP && id < 4) {
+          T_sensor[id] = sensor->readValue(false);
+          T_actual += T_sensor[id];
+          numTempReadings++;
+        }
+        else if (sensor->getSensorCat() == SENSOR_CAP) {
+          capacitance = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_HUM) {
+          humidity += sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_PROX && (id == 0 || id == 3)) {
+          proximity[id] = sensor->readValue(false);
+        }
+      }
+    }
+    T_actual = T_actual / numTempReadings;
+    humidity = humidity / 2;
+
+    // Print status
+    Serial.print(T_actual + (String)" " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
+    Serial.println();
+
+    if (next_period > routine_start + runduration_ms) break;
+
+    // Timing (use micros?)
+    uint32_t period_end = millis();
+    if (period_end < next_period) {
+      delay(next_period - period_end);
+    }
+    else {
+      Serial.println((String)"TIMING: " + ((int32_t) next_period - period_end));
+    }
+  }
+}
+
+
 
 #define PERIOD 250000    //us
 
@@ -490,10 +533,11 @@ void loop() {
   uint32_t period_start = micros();
   
   if (startPrimaryRoutine) {
-    routine_main();
+    routine_fall1rise1();
     startPrimaryRoutine = false;
   }
   if (startSecondaryRoutine) {
+    routine_nopid30min();
     startSecondaryRoutine = false;
   }
 
