@@ -85,6 +85,7 @@ bool CapacitorReadout::init() {
 }
 
 float CapacitorReadout::getFrequency() {
+    delay(1);
     ignoreMeasurement = false;
     timer->resume();
     delay(numSamples - 1);  // delay for x ms (assuming minimum frequency is 1 kHz)
