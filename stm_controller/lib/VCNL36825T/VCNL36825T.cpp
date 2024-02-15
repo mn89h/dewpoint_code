@@ -62,11 +62,11 @@ boolean VCNL36825T::_init() {
   setProximityHighResolution(true);
   setProximityIntegrationTime(VCNL36825T_ProximityIntegration::PROXIMITY_INTEGRATION_TIME_8T);
   setProximityIntegrationTimeBank(VCNL36825T_ProximityIntegrationBank::PROXIMITY_INTEGRATION_TIME_BANK_50US);
-  setMultiPulse(VCNL36825T_MultiPulse::MPS1);
+  setMultiPulse(VCNL36825T_MultiPulse::MPS4);
   setProximityLEDCurrent(VCNL36825T_LEDCurrent::LED_CURRENT_20MA);
   setProximityLEDPeriod(VCNL36825T_LEDPeriod::PERIOD_80MS);
 
-
+  enableForceMode(true);
   enableProximity(true);
 
   return true;
@@ -112,6 +112,25 @@ void VCNL36825T::enableSensor(bool start) {
 void VCNL36825T::enableProximity(bool enable) {
   ps_conf2.st = (uint8_t) ~enable;
   writeRegister(VCNL36825T_REG__PS_CONF2, ps_conf2.rawData);
+}
+
+/*!
+    @brief Enable Force Mode (PS_AF)
+    @param  enable
+            Set to true to enable proximity measurements,
+            set to false to disable.
+*/
+void VCNL36825T::enableForceMode(bool enable) {
+  ps_conf3.af = (uint8_t) enable;
+  writeRegister(VCNL36825T_REG__PS_CONF3, ps_conf3.rawData);
+}
+
+/*!
+    @brief Trigger Single Measurement (Force Mode needs to be enabled first). Need to delay manually after trigger.
+*/
+void VCNL36825T::triggerSingle() {
+  ps_conf3.trig = 1;
+  writeRegister(VCNL36825T_REG__PS_CONF3, ps_conf3.rawData);
 }
 
 /******************** Tuning Functions ********************************** */

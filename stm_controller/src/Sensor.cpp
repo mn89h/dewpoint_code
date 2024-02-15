@@ -156,6 +156,8 @@ float Sensor::readValue(SHT31 &sensor, bool writeToSerial)
 float Sensor::readValue(VCNL36825T &sensor, bool writeToSerial)
 {
     binaryFloat reading;
+    sensor.triggerSingle();
+    delayMicroseconds(3500); // (IT = 400us, MPS = 4)
     reading.value = (float) sensor.getProximity();
 
     if (writeToSerial) {
@@ -167,6 +169,8 @@ float Sensor::readValue(VCNL36825T &sensor, bool writeToSerial)
 float Sensor::readValue(VCNL4040 &sensor, bool writeToSerial)
 {
     binaryFloat reading;
+    sensor.triggerSingle();
+    delayMicroseconds(2000);
     reading.value = (float) sensor.getProximity();
 
     if (writeToSerial) {

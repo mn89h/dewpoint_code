@@ -145,6 +145,8 @@ public:
 
   void enableSensor(bool start);
   void enableProximity(bool enable);
+  void enableForceMode(bool enable);
+  void triggerSingle();
 
   // Interrupts
   /*

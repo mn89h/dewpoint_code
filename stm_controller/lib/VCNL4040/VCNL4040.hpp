@@ -160,6 +160,8 @@ public:
   void enableProximity(bool enable);
   void enableAmbientLight(bool enable);
   void enableWhiteLight(bool enable);
+  void enableForceMode(bool enable);
+  void triggerSingle();
 
   // Interrupts
   /*

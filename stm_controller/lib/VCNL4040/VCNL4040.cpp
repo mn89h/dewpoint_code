@@ -55,10 +55,16 @@ bool VCNL4040::init() {
 }
 
 bool VCNL4040::_init() {
-  enableProximity(true);
-  enableWhiteLight(true);
-  enableAmbientLight(true);
+  delay(3);
+
+  setProximityLEDCurrent(VCNL4040_LEDCurrent::LED_CURRENT_200MA);
+  setProximityLEDDutyCycle(VCNL4040_LEDDutyCycle::LED_DUTY_1_80);
+  setProximityIntegrationTime(VCNL4040_ProximityIntegration::PROXIMITY_INTEGRATION_TIME_8T);
   setProximityHighResolution(true);
+  enableForceMode(true);
+  enableProximity(true);
+  enableWhiteLight(false);
+  enableAmbientLight(false);
 
   return true;
 }
@@ -87,7 +93,24 @@ uint16_t VCNL4040::getAmbientLight() {
 uint16_t VCNL4040::getWhiteLight() {
   return readRegister(VCNL4040_REG__WHITE_DATA);
 }
+/*!
+    @brief Enable Force Mode (PS_AF)
+    @param  enable
+            Set to true to enable proximity measurements,
+            set to false to disable.
+*/
+void VCNL4040::enableForceMode(bool enable) {
+  ps_conf3Ms.af = (uint8_t) enable;
+  writeRegister(VCNL4040_REG__PS_CONF3_MS, ps_conf3Ms.rawData);
+}
 
+/*!
+    @brief Trigger Single Measurement (Force Mode needs to be enabled first). Need to delay manually after trigger.
+*/
+void VCNL4040::triggerSingle() {
+  ps_conf3Ms.trig = 1;
+  writeRegister(VCNL4040_REG__PS_CONF3_MS, ps_conf3Ms.rawData);
+}
 
 /*!
     @brief Gets the current ambient light sensor in Lux.
@@ -256,8 +279,6 @@ void VCNL4040::writeRegister(uint8_t reg, uint16_t data) {
 	wire->write(reg);
   wire->write(lowByte(data));
   wire->write(highByte(data));
-  Serial.println(lowByte(data));
-  Serial.println(highByte(data));
 	wire->endTransmission();
 }
 
