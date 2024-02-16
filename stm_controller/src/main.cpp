@@ -276,9 +276,9 @@ void routine_fall1rise1() {
       }
       else if (sensor->getSensorCat() == SENSOR_PROX) {
         reading = sensor->readValue(false);
-        if (reading <= 5000.0 || reading >= 15000.0) {
+        if (reading <= 4000.0 || reading >= 55000.0) {
           self_check_failed = true;
-          Serial.println("Prox failed!");
+          Serial.println("Prox failed! " + (String) reading + " " + sensor->getSensorId());
         }
       }
       else if (sensor->getSensorCat() == SENSOR_CAP) {
@@ -303,8 +303,9 @@ void routine_fall1rise1() {
   float deltaTperPeriod = 0.0;
   float T_next = 0.0;
   float T_actual = __FLT_MAX__;
+  float T_sensor[4];
   float humidity = 0.0;
-  float proximity = 0.0;
+  float proximity[4];
   float capacitance = 0.0;
   uint8_t numTempReadings = 0;
 
@@ -318,8 +319,8 @@ void routine_fall1rise1() {
   float integrator = 0.0;
 	float differentiator = 0.0;
 
-  const float T_targets[2] = {10.0, 20.0};
-  const float deltaTperSs[3] = {-0.6, 0, 0.2};
+  const float T_targets[2] = {4.0, 15.0};
+  const float deltaTperSs[3] = {-0.2, 0, 0.1};
 
   enum State {
     ENTRY,
@@ -338,6 +339,7 @@ void routine_fall1rise1() {
                       "stability test (slow +dT)";
   Serial.println(info_head);
   Serial.println(info);
+  const String cols = "Ttarget Tavg T0 T1 T2 T3 Havg P I D Errow PID PROX0 PROX3 CAP";
 
   uint32_t time_checkpoint;
   bool finished = false;
@@ -356,18 +358,20 @@ void routine_fall1rise1() {
     
     for (auto &&sensor : sensors){
       if (sensor->getStatus()) {
-        if (sensor->getSensorCat() == SENSOR_TEMP) {
-          T_actual += sensor->readValue(false);
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_TEMP && id < 4) {
+          T_sensor[id] = sensor->readValue(false);
+          T_actual += T_sensor[id];
           numTempReadings++;
-        }
-        else if (sensor->getSensorCat() == SENSOR_PROX) {
-          proximity = sensor->readValue(false);
         }
         else if (sensor->getSensorCat() == SENSOR_CAP) {
           capacitance = sensor->readValue(false);
         }
         else if (sensor->getSensorCat() == SENSOR_HUM) {
           humidity += sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_PROX && (id == 0 || id == 3)) {
+          proximity[id] = sensor->readValue(false);
         }
       }
     }
@@ -378,9 +382,9 @@ void routine_fall1rise1() {
     switch (state) {
       case ENTRY : {
         state = STAGE0_DESCEND;
-        T_target = 10.0;
+        T_target = T_targets[0];
         T_next = T_actual;
-        deltaTperS = -0.6;
+        deltaTperS = deltaTperSs[0];
         deltaTperPeriod = deltaTperS * periodS;
         break;
       }
@@ -388,7 +392,7 @@ void routine_fall1rise1() {
         if (T_next < T_target) T_next = T_target;
         if (T_actual <= T_target) {
           state = STAGE0_HOLD;
-          deltaTperS = 0;
+          deltaTperS = deltaTperSs[1];
           deltaTperPeriod = deltaTperS * periodS;
           time_checkpoint = period_start;
         }
@@ -397,8 +401,8 @@ void routine_fall1rise1() {
       case STAGE0_HOLD : {
         if (period_start - time_checkpoint >= 3000) {
           state = STAGE1_ASCEND;
-          T_target = 20.0;
-          deltaTperS = 0.2;
+          T_target = T_targets[1];
+          deltaTperS = deltaTperSs[2];
           deltaTperPeriod = deltaTperS * periodS;
         }
       }
@@ -439,7 +443,7 @@ void routine_fall1rise1() {
     analogWrite(PB4, (uint8_t)pwm_factor);
 
     // Print status
-    Serial.print(T_actual + (String)" " + T_next + " " + humidity + " " + proportional + " " + integrator + " " + differentiator + " " + error + " " + (uint8_t)pwm_factor + " " + proximity + " " + capacitance);
+    Serial.print(T_next + (String)" " + T_actual + " " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity + " " + proportional + " " + integrator + " " + differentiator + " " + error + " " + pwm_factor + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
     Serial.println();
 
     // Timing (use micros?)
