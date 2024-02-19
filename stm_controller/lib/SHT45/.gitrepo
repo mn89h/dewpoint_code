@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/ArtronShop/ArtronShop_SHT45.git
+	branch = main
+	commit = a95791df2c46069194893ac83363a352c9f8a6d6
+	parent = c34cedc7db7639d8089ec7580d334158fff83f86
+	method = merge
+	cmdver = 0.4.6

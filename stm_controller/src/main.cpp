@@ -212,8 +212,8 @@ void setup() {
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL36825T(&i2c_rigid, VCNL36825T_ADDR), typeid(VCNL36825T), "VCNL36825T:BORDER", SENSOR_PROX, 1, &i2c_rigid, I2CSWITCH_ADDR, 1, false));
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:BORDER", SENSOR_PROX, 2, &i2c_rigid, I2CSWITCH_ADDR, 2, false));
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:CENTER", SENSOR_PROX, 3, &i2c_rigid, I2CSWITCH_ADDR, 3, true));
-  sensors.push_back(std::make_unique<Sensor>((void*) new SHT4X(&i2c_flex1), typeid(SHT4X), "SHT45:BORDER", SENSOR_HUM, 0, &i2c_flex1, I2CSWITCH_ADDR, 0, true));
-  sensors.push_back(std::make_unique<Sensor>((void*) new SHT4X(&i2c_flex1), typeid(SHT4X), "SHT45:CENTER", SENSOR_HUM, 1, &i2c_flex1, I2CSWITCH_ADDR, 2, true));
+  sensors.push_back(std::make_unique<Sensor>((void*) new SHT45(&i2c_flex1), typeid(SHT45), "SHT45:BORDER", SENSOR_HUM, 0, &i2c_flex1, I2CSWITCH_ADDR, 0, true));
+  sensors.push_back(std::make_unique<Sensor>((void*) new SHT45(&i2c_flex1), typeid(SHT45), "SHT45:CENTER", SENSOR_HUM, 1, &i2c_flex1, I2CSWITCH_ADDR, 2, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new BME280Wrapper(&i2c_flex1), typeid(BME280Wrapper), "BME280", SENSOR_AMB, 0, &i2c_rigid, I2CSWITCH_ADDR, 2, true));
 
   for (auto &&sensor : sensors){
