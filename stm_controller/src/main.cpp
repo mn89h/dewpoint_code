@@ -28,6 +28,7 @@ bool readLight;
 bool controlPeltier;
 bool startPrimaryRoutine;
 bool startSecondaryRoutine;
+uint32_t timelimitMS = 200;
 int readTemperatureSamples;
 int currentTemperatureSample = 0;
 uint16_t initial_light_value;
@@ -143,6 +144,14 @@ void startRoutine(SerialCommands* sender) {
 void startRoutine2(SerialCommands* sender) {
 	startSecondaryRoutine = true;
 }
+void setTimelimit(SerialCommands* sender) {
+	char* tl_str = sender->Next();
+	if (tl_str == NULL) {
+		sender->GetSerial()->println("ERROR NO_ID");
+		return;
+	}
+  timelimitMS = atoi(tl_str);
+}
 
 char serial_command_buffer_[48];
 SerialCommands serial_commands_(&Serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\r\n", " ");
@@ -158,6 +167,7 @@ SerialCommand cmd_readLight_off("READ_LIGHT_OFF", readLight_off);
 SerialCommand cmd_reset("RESET", reset);
 SerialCommand cmd_start1("START", startRoutine);
 SerialCommand cmd_start2("START2", startRoutine2);
+SerialCommand cmd_setTimelimit("TL", setTimelimit);
 
 void setup() {
 
@@ -183,6 +193,7 @@ void setup() {
   serial_commands_.AddCommand(&cmd_reset);
   serial_commands_.AddCommand(&cmd_start1);
   serial_commands_.AddCommand(&cmd_start2);
+  serial_commands_.AddCommand(&cmd_setTimelimit);
 
   i2c_flex1.begin();
   // i2c_flex2.begin();
@@ -276,7 +287,7 @@ void routine_fall1rise1() {
       }
       else if (sensor->getSensorCat() == SENSOR_PROX) {
         reading = sensor->readValue(false);
-        if (reading <= 4000.0 || reading >= 55000.0) {
+        if (reading <= 4000.0 || reading >= 60000.0) {
           self_check_failed = true;
           Serial.println("Prox failed! " + (String) reading + " " + sensor->getSensorId());
         }
@@ -319,15 +330,17 @@ void routine_fall1rise1() {
   float integrator = 0.0;
 	float differentiator = 0.0;
 
-  const float T_targets[2] = {4.0, 15.0};
-  const float deltaTperSs[3] = {-0.2, 0, 0.1};
+  const float T_targets[3] = {5.5, 13.0, 5.5};
+  const float deltaTperSs[6] = {-0.8, 0, 1, 0, -0.1, 0};
 
   enum State {
     ENTRY,
     STAGE0_DESCEND,
     STAGE0_HOLD,
     STAGE1_ASCEND,
-    STAGE1_HOLD
+    STAGE1_HOLD,
+    STAGE2_DESCEND,
+    STAGE2_HOLD
   };
   State state = ENTRY;
 
@@ -399,19 +412,51 @@ void routine_fall1rise1() {
         break;
       }
       case STAGE0_HOLD : {
-        if (period_start - time_checkpoint >= 3000) {
+        if (period_start - time_checkpoint >= 4000) {
           state = STAGE1_ASCEND;
           T_target = T_targets[1];
           deltaTperS = deltaTperSs[2];
           deltaTperPeriod = deltaTperS * periodS;
+          time_checkpoint = period_start;
         }
+        break;
       }
       case STAGE1_ASCEND : {
         if (T_next > T_target) T_next = T_target;
         if (T_actual >= T_target) {
-          Serial.println("Finished");
-          finished = true;
+          state = STAGE1_HOLD;
+          deltaTperS = deltaTperSs[3];
+          deltaTperPeriod = deltaTperS * periodS;
+          time_checkpoint = period_start;
         }
+        break;
+      }
+      case STAGE1_HOLD : {
+        if (period_start - time_checkpoint >= 500) {
+          state = STAGE2_DESCEND;
+          T_target = T_targets[2];
+          deltaTperS = deltaTperSs[4];
+          deltaTperPeriod = deltaTperS * periodS;
+          time_checkpoint = period_start;
+        }
+        break;
+      }
+      case STAGE2_DESCEND : {
+        if (T_next < T_target) T_next = T_target;
+        if (T_actual <= T_target) {
+          state = STAGE2_HOLD;
+          deltaTperS = deltaTperSs[5];
+          deltaTperPeriod = deltaTperS * periodS;
+          time_checkpoint = period_start;
+        }
+        break;
+      }
+      case STAGE2_HOLD : {
+        if (period_start - time_checkpoint >= 4000) {
+          finished = true;
+          time_checkpoint = period_start;
+        }
+        break;
       }
     }
 
@@ -471,7 +516,10 @@ void routine_nopid30min() {
   float capacitance = 0.0;
   float proximity[4];
   uint8_t numTempReadings = 0;
-  const uint32_t runduration_ms = 30 * 60 * 1000; // min * s * us
+  uint32_t runduration_ms = 30 * 60 * 1000; // min * s * us
+  if (timelimitMS != 0) {
+    runduration_ms = timelimitMS;
+  }
 
   const String info_head = "routine_name duration period PID T hum cap prox T_target(s) kp ki kd info";
   const String info = "nopid30min 30min 0.2s - x x x - - - stability test (slow +dT)";
