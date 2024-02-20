@@ -169,6 +169,16 @@ SerialCommand cmd_start1("START", startRoutine);
 SerialCommand cmd_start2("START2", startRoutine2);
 SerialCommand cmd_setTimelimit("TL", setTimelimit);
 
+template <typename T, size_t N>
+constexpr String arrayToString(T (&arr)[N]) {
+  String returnVal = "";
+  for (int i = 0; i < N - 1; i++) {
+    returnVal += (String) (arr[i]) + ";";
+  }
+  returnVal += (String) (arr[N - 1]);
+  return returnVal;
+}
+
 void setup() {
 
   // Initiate wire library and serial communication
@@ -274,6 +284,15 @@ void setup() {
 
 void routine_fall1rise1() {
   // Selfcheck
+  // initiate measurements
+  for (auto &&sensor : sensors){
+    if (sensor->getStatus()) {
+      if (sensor->getSensorCat() != SENSOR_CAP) {
+        sensor->measure(true);
+      }
+    }
+    delayMicroseconds(50);
+  }
   float reading;
   bool self_check_failed = false;
   for (auto &&sensor : sensors){
@@ -293,6 +312,7 @@ void routine_fall1rise1() {
         }
       }
       else if (sensor->getSensorCat() == SENSOR_CAP) {
+        sensor->measure(false);
         reading = sensor->readValue(false);
         if (reading <= 5000.0 || reading >= 12000.0) {
           self_check_failed = true;
@@ -308,51 +328,55 @@ void routine_fall1rise1() {
 
   const uint32_t periodMS = 200;
   const float periodS = (float) periodMS / 1000; 
-  float limit = 200.0;
-  float T_target = 0.0;
   float deltaTperS = 0.0;
   float deltaTperPeriod = 0.0;
   float T_next = 0.0;
   float T_actual = __FLT_MAX__;
-  float T_sensor[4];
-  float humidity = 0.0;
+  float T_sensor[5];
+  float humidity[3];
+  float pressure;
   float proximity[4];
   float capacitance = 0.0;
   uint8_t numTempReadings = 0;
 
   float error = 0.0;
   float prev_error = 0.0;
-  float Kp = 20; // 27
-  float Ki = 5;
-  float Kd = 30;
+  const float Kp = 20; // 27
+  const float Ki = 5;
+  const float Kd = 30;
+  const float limit = 200.0;
   float pwm_factor = 0.0;
   float proportional = 0.0;
   float integrator = 0.0;
 	float differentiator = 0.0;
 
-  const float T_targets[3] = {5.5, 13.0, 5.5};
-  const float deltaTperSs[6] = {-0.8, 0, 1, 0, -0.1, 0};
+  const uint8_t numStates = 7;
+  // deltaTperS == 0 defines hold, please make sure proper holdTime is set at respective array index
+  const float deltaTperSs[numStates] = {0, -0.8, 0, 1, 0, -0.1, 0};
+  const float T_targets[numStates] = {0, 5.5, 5.5, 13.0, 13.0, 5.5, 5.5};
+  const uint32_t holdTimes[numStates] = {0, 0, 4000, 0, 500, 0, 4000};
 
-  enum State {
-    ENTRY,
-    STAGE0_DESCEND,
-    STAGE0_HOLD,
-    STAGE1_ASCEND,
-    STAGE1_HOLD,
-    STAGE2_DESCEND,
-    STAGE2_HOLD
+  uint8_t state = 0;
+  bool next_state = true;
+  bool initialized = false;
+
+  enum Direction {
+    HOLD,
+    ASCENDING,
+    DESCENDING
   };
-  State state = ENTRY;
+  Direction direction = DESCENDING;
 
-  const String info_head = "routine_name duration period PID T hum cap prox T_target(s) dT(s) kp ki kd info";
+  const String info_head = "routine_name duration period PID T hum cap prox dTs T_targets holdTimes kp ki kd info";
   const String info = "main_fall1rise1 - 0.2s x x x x " + 
-                      (String) T_targets[0] + ";" + T_targets[1] + " " +
-                      deltaTperSs[0] + ";" + deltaTperSs[1] + ";" + deltaTperSs[2] + " " +
+                      arrayToString(deltaTperSs) + " " +
+                      arrayToString(T_targets) + " " +
+                      arrayToString(holdTimes) + " " +
                       Kp + " " + Ki + " " + Kd + " " + 
                       "stability test (slow +dT)";
   Serial.println(info_head);
   Serial.println(info);
-  const String cols = "Ttarget Tavg T0 T1 T2 T3 Havg P I D Errow PID PROX0 PROX3 CAP";
+  const String cols = "Ttarget Tavg T0 T1 T2 T3 T4 H0 H1 H2 P2 P I D Error PID PROX0 PROX3 CAP";
 
   uint32_t time_checkpoint;
   bool finished = false;
@@ -364,10 +388,30 @@ void routine_fall1rise1() {
     analogWrite(PB4, 0);
     delayMicroseconds(100);
 
+    // initiate measurements
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_CAP) {
+          sensor->measure(false);
+          capacitance = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_PROX) {
+          sensor->measure(false);
+        }
+        else {
+          sensor->measure(true);
+        }
+      }
+      delayMicroseconds(50);
+    }
+
+    // wait for measurements to finish
+    delay(10);
+
     // read current temperature and sensor values
     numTempReadings = 0;
     T_actual = 0;
-    humidity = 0;
     
     for (auto &&sensor : sensors){
       if (sensor->getStatus()) {
@@ -377,96 +421,68 @@ void routine_fall1rise1() {
           T_actual += T_sensor[id];
           numTempReadings++;
         }
-        else if (sensor->getSensorCat() == SENSOR_CAP) {
-          capacitance = sensor->readValue(false);
+        if (sensor->getSensorCat() == SENSOR_TEMP && id == 4) {
+          T_sensor[id] = sensor->readValue(false);
         }
         else if (sensor->getSensorCat() == SENSOR_HUM) {
-          humidity += sensor->readValue(false);
+          humidity[id] = sensor->readValue(false);
         }
         else if (sensor->getSensorCat() == SENSOR_PROX && (id == 0 || id == 3)) {
           proximity[id] = sensor->readValue(false);
         }
+        else if (sensor->getSensorCat() == SENSOR_AMB) {
+          humidity[id + 2] = sensor->readValue(false, Sensor::DataType::HUM);
+          pressure = sensor->readValue(false, Sensor::DataType::PRESS, false);
+        }
       }
     }
-    humidity = humidity / 2;
     T_actual = T_actual / numTempReadings;
 
-    // decide next state based on temperature or time
-    switch (state) {
-      case ENTRY : {
-        state = STAGE0_DESCEND;
-        T_target = T_targets[0];
+    // initialize T_next and set time_checkpoint for use in hold states
+    // also set direction and deltaTperPeriod (not really necessary but provides readability)
+    if (next_state) {
+      if (!initialized) {
         T_next = T_actual;
-        deltaTperS = deltaTperSs[0];
-        deltaTperPeriod = deltaTperS * periodS;
-        break;
+        initialized = true;
       }
-      case STAGE0_DESCEND : {
-        if (T_next < T_target) T_next = T_target;
-        if (T_actual <= T_target) {
-          state = STAGE0_HOLD;
-          deltaTperS = deltaTperSs[1];
-          deltaTperPeriod = deltaTperS * periodS;
-          time_checkpoint = period_start;
-        }
-        break;
+
+      deltaTperS = deltaTperSs[state];
+      deltaTperPeriod = deltaTperS * periodS;
+      if (deltaTperPeriod < 0.0) {
+        direction = DESCENDING;
       }
-      case STAGE0_HOLD : {
-        if (period_start - time_checkpoint >= 4000) {
-          state = STAGE1_ASCEND;
-          T_target = T_targets[1];
-          deltaTperS = deltaTperSs[2];
-          deltaTperPeriod = deltaTperS * periodS;
-          time_checkpoint = period_start;
-        }
-        break;
+      else if (deltaTperPeriod > 0.0) {
+        direction = ASCENDING;
       }
-      case STAGE1_ASCEND : {
-        if (T_next > T_target) T_next = T_target;
-        if (T_actual >= T_target) {
-          state = STAGE1_HOLD;
-          deltaTperS = deltaTperSs[3];
-          deltaTperPeriod = deltaTperS * periodS;
-          time_checkpoint = period_start;
-        }
-        break;
+      else {
+        direction = HOLD;
       }
-      case STAGE1_HOLD : {
-        if (period_start - time_checkpoint >= 500) {
-          state = STAGE2_DESCEND;
-          T_target = T_targets[2];
-          deltaTperS = deltaTperSs[4];
-          deltaTperPeriod = deltaTperS * periodS;
-          time_checkpoint = period_start;
-        }
-        break;
-      }
-      case STAGE2_DESCEND : {
-        if (T_next < T_target) T_next = T_target;
-        if (T_actual <= T_target) {
-          state = STAGE2_HOLD;
-          deltaTperS = deltaTperSs[5];
-          deltaTperPeriod = deltaTperS * periodS;
-          time_checkpoint = period_start;
-        }
-        break;
-      }
-      case STAGE2_HOLD : {
-        if (period_start - time_checkpoint >= 4000) {
-          finished = true;
-          time_checkpoint = period_start;
-        }
-        break;
-      }
+      next_state = false;
+      time_checkpoint = period_start;
+    }
+
+    // Calculate next target temperature
+    T_next = T_next + deltaTperPeriod;
+
+    // Limit T_next
+    if ((direction == DESCENDING && T_next < T_targets[state]) ||
+        (direction == ASCENDING && T_next > T_targets[state])) {
+      T_next = T_targets[state];
+    }
+
+    // Check if T_target or holdTime has been reached and continue to next_state (or finish)
+    if ((direction == DESCENDING && T_actual <= T_targets[state]) ||
+        (direction == ASCENDING && T_actual >= T_targets[state]) ||
+        (direction == HOLD && (period_start - time_checkpoint) >= holdTimes[state])) {
+      state += 1;
+      if (state < numStates) next_state = true;
+      else finished = true;
     }
 
     // Break loop if execution is finished
     if (finished) {
       break;
     }
-
-    // Calculate next target temperature
-    T_next = T_next + deltaTperPeriod;
 
     // Calculate error between next target temperature and current temperature
     prev_error = error;
@@ -488,7 +504,7 @@ void routine_fall1rise1() {
     analogWrite(PB4, (uint8_t)pwm_factor);
 
     // Print status
-    Serial.print(T_next + (String)" " + T_actual + " " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity + " " + proportional + " " + integrator + " " + differentiator + " " + error + " " + pwm_factor + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
+    Serial.print(T_next + (String)" " + T_actual + " " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + T_sensor[4] + " " + humidity[0] + " "  + humidity[1] + " "  + humidity[2] + " "  + pressure + " " + proportional + " " + integrator + " " + differentiator + " " + error + " " + pwm_factor + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
     Serial.println();
 
     // Timing (use micros?)
@@ -512,7 +528,8 @@ void routine_nopid30min() {
   const float periodS = (float) periodMS / 1000; 
   float T_sensor[4];
   float T_actual = 0.0;
-  float humidity = 0.0;
+  float humidity[3];
+  float pressure;
   float capacitance = 0.0;
   float proximity[4];
   uint8_t numTempReadings = 0;
@@ -530,11 +547,28 @@ void routine_nopid30min() {
   uint32_t next_period = routine_start;
   while(true) {
     next_period = next_period + 200;
+    
+    // initiate measurements
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_CAP) {
+          sensor->measure(false);
+          capacitance = sensor->readValue(false);
+        }
+        else {
+          sensor->measure(true);
+        }
+      }
+      delayMicroseconds(50);
+    }
+
+    // wait for measurements to finish
+    delay(20);
 
     // read current temperature and sensor values
     numTempReadings = 0;
     T_actual = 0;
-    humidity = 0;
     
     for (auto &&sensor : sensors){
       if (sensor->getStatus()) {
@@ -544,22 +578,22 @@ void routine_nopid30min() {
           T_actual += T_sensor[id];
           numTempReadings++;
         }
-        else if (sensor->getSensorCat() == SENSOR_CAP) {
-          capacitance = sensor->readValue(false);
-        }
         else if (sensor->getSensorCat() == SENSOR_HUM) {
-          humidity += sensor->readValue(false);
+          humidity[id] = sensor->readValue(false);
         }
         else if (sensor->getSensorCat() == SENSOR_PROX && (id == 0 || id == 3)) {
           proximity[id] = sensor->readValue(false);
         }
+        else if (sensor->getSensorCat() == SENSOR_AMB) {
+          humidity[id + 2] = sensor->readValue(false, Sensor::DataType::HUM);
+          pressure = sensor->readValue(false, Sensor::DataType::PRESS, false);
+        }
       }
     }
     T_actual = T_actual / numTempReadings;
-    humidity = humidity / 2;
 
     // Print status
-    Serial.print(T_actual + (String)" " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
+    Serial.print(T_actual + (String)" " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity[0] + " " + humidity[1] + " " + humidity[2] + " " + pressure + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
     Serial.println();
 
     if (next_period > routine_start + runduration_ms) break;
