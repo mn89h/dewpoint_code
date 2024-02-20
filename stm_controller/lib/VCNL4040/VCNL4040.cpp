@@ -105,11 +105,21 @@ void VCNL4040::enableForceMode(bool enable) {
 }
 
 /*!
-    @brief Trigger Single Measurement (Force Mode needs to be enabled first). Need to delay manually after trigger.
+    @brief Wait for 6500 (used after single triggering)
 */
-void VCNL4040::triggerSingle() {
+void VCNL4040::wait() {
+  delayMicroseconds(6000);
+}
+
+/*!
+    @brief Trigger Single Measurement (Force Mode needs to be enabled first).
+    @param asyncMode False: delay after trigger, True: do nothing.
+*/
+bool VCNL4040::triggerSingle(bool asyncMode) {
   ps_conf3Ms.trig = 1;
   writeRegister(VCNL4040_REG__PS_CONF3_MS, ps_conf3Ms.rawData);
+  if(!asyncMode) wait();
+  return true;
 }
 
 /*!

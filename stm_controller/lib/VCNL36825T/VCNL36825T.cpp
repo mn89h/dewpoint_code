@@ -52,11 +52,11 @@ VCNL36825T::VCNL36825T(TwoWire *wire, uint8_t i2c_addr) :
  *    @brief  Initializes the settings
  *    @return True if initialization was successful, otherwise false.
  */
-boolean VCNL36825T::init() {
+bool VCNL36825T::init() {
   return _init();
 }
 
-boolean VCNL36825T::_init() {
+bool VCNL36825T::_init() {
   delay(5);
   enableSensor(true);
   setProximityHighResolution(true);
@@ -126,11 +126,23 @@ void VCNL36825T::enableForceMode(bool enable) {
 }
 
 /*!
-    @brief Trigger Single Measurement (Force Mode needs to be enabled first). Need to delay manually after trigger.
+    @brief Wait for 6500 (used after single triggering)
 */
-void VCNL36825T::triggerSingle() {
+void VCNL36825T::wait() {
+  delayMicroseconds(6500); // valid for (IT = 400us, MPS = 4)
+}
+
+/*!
+    @brief Trigger Single Measurement (Force Mode needs to be enabled first).
+    @param asyncMode False: delay after trigger, True: do nothing.
+*/
+bool VCNL36825T::triggerSingle(bool asyncMode) {
   ps_conf3.trig = 1;
   writeRegister(VCNL36825T_REG__PS_CONF3, ps_conf3.rawData);
+  ps_conf3.trig = 0;
+  if(!asyncMode) wait();
+  getProximity(); // ugly workaround for values not appearing after delay and single read
+  return true;
 }
 
 /******************** Tuning Functions ********************************** */

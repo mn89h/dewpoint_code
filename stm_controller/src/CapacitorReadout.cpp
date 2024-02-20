@@ -84,33 +84,37 @@ bool CapacitorReadout::init() {
     return true;
 }
 
-float CapacitorReadout::getFrequency() {
-    delay(1);
+void CapacitorReadout::wait() {
+  delay(numSamples - 1);      // delay for x ms (assuming minimum frequency is 1 kHz)
+}
+
+bool CapacitorReadout::measure(bool asyncMode) {
+    if(!asyncMode) {
+      delay(1);               // delay before 
+    }
     ignoreMeasurement = false;
+    counted_ticks = 0;
     timer->resume();
-    delay(numSamples - 1);  // delay for x ms (assuming minimum frequency is 1 kHz)
-    timer->pause();         // force timer stop
-    float returnVal = 0.0;
+    if(!asyncMode) {
+      this->wait();
+    }
+    timer->pause();           // force timer stop
     if (!ignoreMeasurement) {
         for (int i = 1; i < numSamples; i++) {
-            returnVal += samples[i];
+            counted_ticks += samples[i];
         }
-        returnVal = input_freq / (returnVal / (numSamples - 1));
     }
-    return returnVal;
+    return true;
+}
+
+float CapacitorReadout::getFrequency() {
+  if (counted_ticks == 0) return __FLT_MAX__;
+  float returnVal = input_freq / (counted_ticks / (numSamples - 1));
+  return returnVal;
 }
 
 uint32_t CapacitorReadout::getTicks() {
-    ignoreMeasurement = false;
-    timer->resume();
-    delay(numSamples - 1);  // delay for x ms (assuming minimum frequency is 1 kHz)
-    timer->pause();         // force timer stop
-    uint32_t returnVal = 0;
-    if (!ignoreMeasurement) {
-        for (int i = 1; i < numSamples; i++) {
-            returnVal += samples[i];
-        }
-        returnVal = (returnVal / (numSamples - 1));
-    }
-    return returnVal;
+  if (counted_ticks == 0) return UINT32_MAX;
+  uint32_t returnVal = (counted_ticks / (numSamples - 1));
+  return returnVal;
 }

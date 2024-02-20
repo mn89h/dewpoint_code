@@ -65,28 +65,34 @@ bool BME280Wrapper::beginSPI()
 
   return (ret == BME280_OK);
 }
-  
-bool BME280Wrapper::measure()
-{
+
+void BME280Wrapper::wait() {
+  if(forced) {
+    uint32_t tmpDelay = bme280_cal_meas_delay(&(bme280.settings));
+    delay(tmpDelay);
+  }
+}
+
+bool BME280Wrapper::receiveData() {
   int8_t ret = BME280_OK;
 
+  ret += bme280_get_sensor_data(BME280_PRESS | BME280_HUM | BME280_TEMP, &comp_data, &bme280);
+
+  return (ret == BME280_OK);
+}
+  
+bool BME280Wrapper::measure(bool asyncMode) {
   if(forced)
   {
     setSensorSettings();
-    uint32_t tmpDelay = bme280_cal_meas_delay(&(bme280.settings));
-    delay(tmpDelay);
-    ret += bme280_get_sensor_data(BME280_PRESS | BME280_HUM | BME280_TEMP, &comp_data, &bme280);
   }
-  else
-  {
-    ret += bme280_get_sensor_data(BME280_PRESS | BME280_HUM | BME280_TEMP, &comp_data, &bme280);
-  }
+  // else periodic measurement
 
-  if(ret != BME280_OK) {
-    error = true;
+  if (!asyncMode) {
+    wait();
+    receiveData();
   }
-
-  return (ret == BME280_OK);
+  return true;
 }
 
 int32_t BME280Wrapper::getTemperature()

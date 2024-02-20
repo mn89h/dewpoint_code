@@ -10,6 +10,8 @@ class CapacitorReadout {
     public:
     CapacitorReadout(PinName pin = PB_6, uint32_t channel = 4);
     bool init();
+    bool measure(bool asyncMode = false);
+    void wait();
     float getFrequency();
     uint32_t getTicks();
 
@@ -21,6 +23,7 @@ class CapacitorReadout {
     static uint32_t channel;
     static PinName measurement_pin;
     static uint32_t numSamples;
+    uint32_t counted_ticks;
     
     static uint32_t input_freq;
     static volatile uint32_t rolloverCompareCount;

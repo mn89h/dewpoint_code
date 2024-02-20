@@ -140,13 +140,14 @@ enum class VCNL36825T_MultiPulse { MPS1, MPS2, MPS4, MPS8 };
 class VCNL36825T {
 public:
   VCNL36825T(TwoWire *wire, uint8_t i2c_addr = VCNL36825T_I2CADDR_DEFAULT);
-  boolean init();
+  bool init();
   uint16_t getProximity();
 
   void enableSensor(bool start);
   void enableProximity(bool enable);
   void enableForceMode(bool enable);
-  void triggerSingle();
+  void wait();
+  bool triggerSingle(bool asyncMode);
 
   // Interrupts
   /*

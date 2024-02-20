@@ -9,17 +9,11 @@ bool SHT45::init() {
     return true;
 }
 
-bool SHT45::measure() {
-    this->_wire->beginTransmission(this->_addr);
-    this->_wire->write(0xFD); // high precision
-    if (this->_wire->endTransmission() != 0) {
-        this->_t = -99;
-        this->_h = -99;
-        return false;
-    }
-
+void SHT45::wait() {
     delay(10);
+}
 
+bool SHT45::receiveData() {
     if (this->_wire->requestFrom(this->_addr, (uint8_t)6) != 6) {
         this->_t = -99;
         this->_h = -99;
@@ -44,6 +38,22 @@ bool SHT45::measure() {
         this->_h = 0;
     }
 
+    return true;
+}
+
+bool SHT45::measure(bool asyncMode) {
+    this->_wire->beginTransmission(this->_addr);
+    this->_wire->write(0xFD); // high precision
+    if (this->_wire->endTransmission() != 0) {
+        this->_t = -99;
+        this->_h = -99;
+        return false;
+    }
+
+    if(!asyncMode) {
+        wait();
+        receiveData();
+    }
     return true;
 }
 

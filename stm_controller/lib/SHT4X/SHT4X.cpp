@@ -104,7 +104,7 @@ bool SHT4X::reset(void) {
     @param  prec The desired precision setting, will be used during reads
 */
 /**************************************************************************/
-void SHT4X::setPrecision(sht4x_precision_t prec) { _precision = prec; }
+void SHT4X::setCommand(sht4x_cmd cmd) { _cmd = cmd; }
 
 /**************************************************************************/
 /*!
@@ -112,88 +112,40 @@ void SHT4X::setPrecision(sht4x_precision_t prec) { _precision = prec; }
     @returns  The current precision setting, will be used during reads
 */
 /**************************************************************************/
-sht4x_precision_t SHT4X::getPrecision(void) { return _precision; }
+sht4x_cmd SHT4X::getCommand(void) { return _cmd; }
 
 /**************************************************************************/
 /*!
-    @brief  Sets the heating setting - more heating uses more power and takes
-   longer
-    @param  heat The desired heater setting, will be used during reads
+    @brief  Waits for the measurement to complete
 */
 /**************************************************************************/
-void SHT4X::setHeater(sht4x_heater_t heat) { _heater = heat; }
-
-/**************************************************************************/
-/*!
-    @brief  Gets the heating setting - more heating uses more power and takes
-   longer
-    @returns  The current heater setting, will be used during reads
-*/
-/**************************************************************************/
-sht4x_heater_t SHT4X::getHeater(void) { return _heater; }
-
-/**************************************************************************/
-/*!
-    @brief  Gets the humidity sensor and temperature values as sensor events
-    @param  humidity Sensor event object that will be populated with humidity
-   data
-    @param  temp Sensor event object that will be populated with temp data
-    @returns true if the event data was read successfully
-*/
-/**************************************************************************/
-bool SHT4X::requestMeas() {
-  uint32_t t = millis();
-
-  uint8_t readbuffer[6];
-  uint8_t cmd = SHT4X_NOHEAT_HIGHPRECISION;
-  uint16_t duration = 10;
-
-  if (_heater == SHT4X_NO_HEATER) {
-    if (_precision == SHT4X_HIGH_PRECISION) {
-      cmd = SHT4X_NOHEAT_HIGHPRECISION;
-      duration = 10;
-    }
-    if (_precision == SHT4X_MED_PRECISION) {
-      cmd = SHT4X_NOHEAT_MEDPRECISION;
-      duration = 5;
-    }
-    if (_precision == SHT4X_LOW_PRECISION) {
-      cmd = SHT4X_NOHEAT_LOWPRECISION;
-      duration = 2;
-    }
+void SHT4X::wait() {
+  uint32_t duration = 0;
+  if (_cmd == SHT4X_HIGH_HEATER_100MS || _cmd == SHT4X_MED_HEATER_100MS || _cmd == SHT4X_LOW_HEATER_100MS) {
+    duration = 100;
   }
-
-  if (_heater == SHT4X_HIGH_HEATER_1S) {
-    cmd = SHT4X_HIGHHEAT_1S;
-    duration = 1100;
+  else if (_cmd == SHT4X_HIGH_HEATER_1S || _cmd == SHT4X_MED_HEATER_1S || _cmd == SHT4X_LOW_HEATER_1S) {
+    duration = 1000;
   }
-  if (_heater == SHT4X_HIGH_HEATER_100MS) {
-    cmd = SHT4X_HIGHHEAT_100MS;
-    duration = 110;
+  else if (_cmd == SHT4X_NO_HEATER_HIGHPRECISION) {
+    duration = 10;
   }
-
-  if (_heater == SHT4X_MED_HEATER_1S) {
-    cmd = SHT4X_MEDHEAT_1S;
-    duration = 1100;
+  else if (_cmd == SHT4X_NO_HEATER_MEDPRECISION) {
+    duration = 5;
   }
-  if (_heater == SHT4X_MED_HEATER_100MS) {
-    cmd = SHT4X_MEDHEAT_100MS;
-    duration = 110;
-  }
-
-  if (_heater == SHT4X_LOW_HEATER_1S) {
-    cmd = SHT4X_LOWHEAT_1S;
-    duration = 1100;
-  }
-  if (_heater == SHT4X_LOW_HEATER_100MS) {
-    cmd = SHT4X_LOWHEAT_100MS;
-    duration = 110;
-  }
-
-  if (!writeCmd(cmd)) {
-    return false;
+  else if (_cmd == SHT4X_NO_HEATER_LOWPRECISION) {
+    duration = 2;
   }
   delay(duration);
+}
+
+/**************************************************************************/
+/*!
+    @brief  Waits for the measurement to complete
+*/
+/**************************************************************************/
+bool SHT4X::receiveData() {
+  uint8_t readbuffer[6];
   if (!readBytes(readbuffer, 6)) {
     return false;
   }
@@ -208,6 +160,28 @@ bool SHT4X::requestMeas() {
 
   _humidity = min(max(_humidity, (float)0.0), (float)100.0);
 
+  return true;
+}
+
+
+/**************************************************************************/
+/*!
+    @brief  Gets the humidity sensor and temperature values as sensor events
+    @param  humidity Sensor event object that will be populated with humidity
+   data
+    @param  temp Sensor event object that will be populated with temp data
+    @returns true if the event data was read successfully
+*/
+/**************************************************************************/
+bool SHT4X::measure(bool asyncMode) {
+  if (!writeCmd(_cmd)) {
+    return false;
+  }
+
+  if (!asyncMode) {
+    wait();
+    return receiveData();
+  }
   return true;
 }
 

@@ -16,11 +16,13 @@ class BME280Wrapper
     BME280Wrapper(TwoWire* wire);
     BME280Wrapper(int8_t cspin);
 
-    bool init(bool forced = false);
+    bool init(bool forced = true);
 
-    //this method performs measurement
-    //be sure to call it before reading values
-    bool measure();
+    //these methods performs measurement, waiting and data acquisition
+    //be sure to call before reading values (asyncMode == false performs wait and receive within measure)
+    bool measure(bool asyncMode = false);
+    void wait();
+    bool receiveData();
 
     //Temperature in degrees of Celsius * 100
     int32_t getTemperature();
