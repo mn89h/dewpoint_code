@@ -6,12 +6,12 @@ import re
 import numpy
 
 path = 'C:/Users/malte/Documents/master/measurements/'
-filename_in = 'hum_test3'
+filename_in = 'hum_test16'
 fileext_in = '.txt'
-filename_out = 'hum_test3 - Kopie'
+filename_out = 'hum_test16'
 # filename = 'pid_t0.2_kp20_ki5_kd30'
 
-disable_all_file_preprocessing = True
+disable_all_file_preprocessing = False
 if (disable_all_file_preprocessing):
     fileext_in = '.csv'
 split_header = True
@@ -21,12 +21,14 @@ col_as_offset = True
 
 class Constants:
     PERIOD          = 0.2
-    COL_HUM         = 6 # in old files 5 due to missing T[0]
+    COL_HUM         = 7 # in old files 5 due to missing T[0]
     COL_TEMP_HUM    = 2
     COL_CAP         = [-1]
     COL_TEMP_CAP    = [2]
     COL_PRX         = [-2,-3]
     COL_TEMP_PRX    = [1,1]
+    DCAP_YLIM       = [[-50, 50]]
+    DPRX_YLIM       = [[-50, 50], [-300, 300]]
     
 
 in_full_path = os.path.join(path, filename_in + fileext_in)
@@ -41,10 +43,10 @@ if (~disable_all_file_preprocessing):
             lines = infile.readlines()
             
         with open(out_full_path_txt, 'w') as outfile1: 
-            outfile1.writelines(lines[:3])
+            outfile1.writelines(lines[:4])
             
         with open(out_full_path_csv, 'w') as outfile2:
-           outfile2.writelines(lines[3:-1])
+           outfile2.writelines(lines[4:-1])
     
     # Replace whitespace with commas
     if (check_whitespace):
@@ -86,7 +88,9 @@ print(f'lol: {COL_TEMP} {Constants.COL_CAP} {Constants.COL_PRX}')
 x = numpy.empty(num_lines)
 y_T = numpy.empty((len(COL_TEMP), num_lines)) 
 y_CAP = numpy.empty((len(Constants.COL_CAP), num_lines))
+dy_CAP = numpy.empty((len(Constants.COL_CAP), num_lines))
 y_PRX = numpy.empty((len(Constants.COL_PRX), num_lines)) 
+dy_PRX = numpy.empty((len(Constants.COL_PRX), num_lines)) 
 
 # Fill data storage
 with open(out_full_path_csv) as csvfile:
@@ -108,6 +112,20 @@ with open(out_full_path_csv) as csvfile:
         for i_y, y_Ti in enumerate(y_T):
             y_Ti[i_row] = float(row[COL_TEMP[i_y]])  
         t = t + Constants.PERIOD
+
+for i, y_CAPi in enumerate(y_CAP):
+    for j in range(1,len(y_CAPi)):
+        dy_CAP[i][j] = (y_CAPi[j] - y_CAPi[j-1]) / Constants.PERIOD
+for i, y_PRXi in enumerate(y_PRX):
+    for j in range(1,len(y_PRXi)):
+        dy_PRX[i][j] = (y_PRXi[j] - y_PRXi[j-1]) / Constants.PERIOD
+
+for dy_CAPi in dy_CAP:
+    for j in range(5,len(dy_CAPi)):
+        dy_CAPi[j] = (dy_CAPi[j] + dy_CAPi[j-1] + dy_CAPi[j-2] + dy_CAPi[j-3] + dy_CAPi[j-4]) / 5
+for dy_PRXi in dy_PRX:
+    for j in range(3,len(dy_PRXi)):
+        dy_PRXi[j] = (dy_PRXi[j] + dy_PRXi[j-1] + dy_PRXi[j-2]) / 3
         
 
 # Create needed amount of subplots
@@ -136,8 +154,11 @@ for i_ax1, ax1i in enumerate(ax1):
 
 # Create secondary axis for each temperature vs. time plot
 ax2 = []
+ax3 = []
 for i_ax1, ax1i in enumerate(ax1):
     ax2.append(ax1i.twinx())
+    ax3.append(ax1i.twinx())
+    
     
 # Populate capacitance/light value graphs
 for i_ax2, ax2i in enumerate(ax2):
@@ -148,6 +169,18 @@ for i_ax2, ax2i in enumerate(ax2):
         ax2i.plot(x, y_PRX[i_ax2 - len(Constants.COL_CAP)], 'r')
         ax2i.set_ylabel('Light value', color='red') 
     ax2i.tick_params('y', colors='red')
+    
+# Populate capacitance/light value graphs
+for i_ax3, ax3i in enumerate(ax3):
+    if i_ax3 < len(Constants.COL_CAP):
+        ax3i.plot(x, dy_CAP[i_ax3], 'r', linestyle='solid')
+        ax3i.set_ylim(Constants.DCAP_YLIM[i_ax3])
+    else:
+        ax3i.plot(x, dy_PRX[i_ax3 - len(Constants.COL_CAP)], 'r', linestyle='solid')
+        ax3i.set_ylim(Constants.DPRX_YLIM[i_ax3 - len(Constants.COL_CAP)])
+    ax3i.tick_params('y', colors='red')
+    ax3i.yaxis.tick_left()
+    ax3i.spines['left'].set_position(('axes', 1.0))
     
     
 # Calculate dew point
