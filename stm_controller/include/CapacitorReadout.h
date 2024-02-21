@@ -4,7 +4,7 @@
 #ifndef CAPACITORREADOUT_H
 #define CAPACITORREADOUT_H  
 
-#define CAP_MAXNUMSAMPLES 10
+#define CAP_MAXNUMSAMPLES 20
 
 class CapacitorReadout {
     public:
@@ -22,7 +22,8 @@ class CapacitorReadout {
     static HardwareTimer* timer;
     static uint32_t channel;
     static PinName measurement_pin;
-    static uint32_t numSamples;
+    static const uint32_t numSamples = 8;
+    const int32_t outlier_th = 30;
     uint32_t counted_ticks;
     
     static uint32_t input_freq;
@@ -32,6 +33,7 @@ class CapacitorReadout {
     static volatile bool ignoreMeasurement;
     static volatile uint32_t samples[CAP_MAXNUMSAMPLES];
     static volatile uint8_t ctr;
+
 };
 
 #endif

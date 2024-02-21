@@ -3,7 +3,6 @@
 HardwareTimer* CapacitorReadout::timer;
 uint32_t CapacitorReadout::channel;
 PinName CapacitorReadout::measurement_pin;
-uint32_t CapacitorReadout::numSamples;
 uint32_t CapacitorReadout::input_freq;
 volatile uint32_t CapacitorReadout::rolloverCompareCount;
 volatile uint32_t CapacitorReadout::LastCapture;
@@ -20,15 +19,15 @@ void CapacitorReadout::it_risingEdge() {
   }
   else if (CurrentCapture <= LastCapture) {
     /* 0x10000 is max overflow value */
-    samples[ctr] = 0x10000 + CurrentCapture - LastCapture;
+    samples[ctr] = 0x10000 - LastCapture + CurrentCapture;
   }
+  rolloverCompareCount = 0;
+  LastCapture = CurrentCapture;
   ctr++;
   if (ctr > numSamples - 1) {
     timer->pause();
     ctr = 0;
   }
-  rolloverCompareCount = 0;
-  LastCapture = CurrentCapture;
 }
 
 /* In case of timer rollover, frequency is to low to be measured set value to 0
@@ -37,6 +36,7 @@ void CapacitorReadout::it_rollover() {
   rolloverCompareCount++;
   if (rolloverCompareCount > 1){
     ignoreMeasurement = true;
+    Serial.println("NO");
   }
 }
 
@@ -49,7 +49,6 @@ CapacitorReadout::CapacitorReadout(PinName pin, uint32_t channel)
 }
 
 bool CapacitorReadout::init() {
-    numSamples = 4;
 
     // Automatically retrieve TIM instance and channel associated to measure_frequency_pin
     // in this case it should retrieve Timer 2 channel 2 which is associated to PA1
@@ -72,8 +71,8 @@ bool CapacitorReadout::init() {
     // Example on Nucleo_L476RG with systemClock at 80MHz the interruption processing is around 4,5 microseconds and thus Max frequency is around 220kHz
     uint32_t PrescalerFactor = 1;
     timer->setPrescaleFactor(PrescalerFactor);
-    timer->setOverflow(50000); // Max Period value to have the largest possible time to detect rising edge and avoid timer rollover
-    TIM4->ARR = 0xffffffff; // basically we extend the count to 32 bits, allowing the measurement of much lower frequencies.
+    timer->setOverflow(0xffff); // Max Period value to have the largest possible time to detect rising edge and avoid timer rollover
+    // TIM4->ARR = 0xefffffff; // basically we extend the count to 32 bits, allowing the measurement of much lower frequencies.
     timer->attachInterrupt(channel, it_risingEdge);
     timer->attachInterrupt(it_rollover);
 
@@ -93,28 +92,76 @@ bool CapacitorReadout::measure(bool asyncMode) {
       delay(1);               // delay before 
     }
     ignoreMeasurement = false;
-    counted_ticks = 0;
     timer->resume();
     if(!asyncMode) {
       this->wait();
     }
     timer->pause();           // force timer stop
     if (!ignoreMeasurement) {
-        for (int i = 1; i < numSamples; i++) {
-            counted_ticks += samples[i];
+      counted_ticks = 0;
+      uint32_t used_samples = numSamples - 1;
+      uint32_t sorted_ticks[numSamples-1];
+      for (int i = 1; i < numSamples; i++) {
+        sorted_ticks[i-1] = samples[i];
+        counted_ticks += samples[i];
+      }
+
+      // using median
+      std::sort(std::begin(sorted_ticks), std::end(sorted_ticks));
+      int32_t median = sorted_ticks[(numSamples-1)/2];
+      
+      for (int i = 0; i < numSamples - 1; i++) {
+        uint32_t deviation;
+        if (median > sorted_ticks[i]) deviation = median - sorted_ticks[i];
+        else deviation = sorted_ticks[i] - median;
+        if (deviation > outlier_th) {
+          used_samples--;
+          counted_ticks -= sorted_ticks[i];
         }
+      }
+
+      // // using average
+      // uint32_t average = counted_ticks / used_samples;
+      // for (int i = 1; i < numSamples; i++) {
+      //   uint32_t deviation;
+      //   if (average > samples[i]) deviation = average - samples[i];
+      //   else deviation = samples[i] - average;
+      //   if (deviation > outlier_th) {
+      //     used_samples--;
+      //     counted_ticks -= samples[i];
+      //   }
+      // }
+      if (used_samples != 0)
+        counted_ticks = counted_ticks / used_samples;
+      else {
+        counted_ticks = median;
+        // Serial.print(median);
+        // for (int i = 0; i < numSamples - 1; i++) {
+        //   Serial.print((String)" " + sorted_ticks[i]);
+        // }
+        // Serial.println();
+
+        // counted_ticks = average;
+        // Serial.print(average);
+        // for (int i = 1; i < numSamples; i++) {
+        //   Serial.print((String)" " + samples[i]);
+        // }
+        // Serial.println();
+      }
     }
     return true;
 }
 
 float CapacitorReadout::getFrequency() {
-  if (counted_ticks == 0) return __FLT_MAX__;
-  float returnVal = input_freq / (counted_ticks / (numSamples - 1));
+  if (counted_ticks == 0) {
+    return __FLT_MAX__;
+  }
+  float returnVal = (float) input_freq / (counted_ticks);
   return returnVal;
 }
 
 uint32_t CapacitorReadout::getTicks() {
   if (counted_ticks == 0) return UINT32_MAX;
-  uint32_t returnVal = (counted_ticks / (numSamples - 1));
+  uint32_t returnVal = (counted_ticks);
   return returnVal;
 }

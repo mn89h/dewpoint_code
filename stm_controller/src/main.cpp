@@ -28,6 +28,7 @@ bool readLight;
 bool controlPeltier;
 bool startPrimaryRoutine;
 bool startSecondaryRoutine;
+bool startHeaterRoutine;
 uint32_t timelimitMS = 200;
 int readTemperatureSamples;
 int currentTemperatureSample = 0;
@@ -144,6 +145,9 @@ void startRoutine(SerialCommands* sender) {
 void startRoutine2(SerialCommands* sender) {
 	startSecondaryRoutine = true;
 }
+void startRoutineHeater(SerialCommands* sender) {
+	startHeaterRoutine = true;
+}
 void setTimelimit(SerialCommands* sender) {
 	char* tl_str = sender->Next();
 	if (tl_str == NULL) {
@@ -167,7 +171,15 @@ SerialCommand cmd_readLight_off("READ_LIGHT_OFF", readLight_off);
 SerialCommand cmd_reset("RESET", reset);
 SerialCommand cmd_start1("START", startRoutine);
 SerialCommand cmd_start2("START2", startRoutine2);
+SerialCommand cmd_startHeater("HEAT", startRoutineHeater);
 SerialCommand cmd_setTimelimit("TL", setTimelimit);
+
+
+enum Direction {
+  HOLD,
+  ASCENDING,
+  DESCENDING
+};
 
 template <typename T, size_t N>
 constexpr String arrayToString(T (&arr)[N]) {
@@ -177,6 +189,12 @@ constexpr String arrayToString(T (&arr)[N]) {
   }
   returnVal += (String) (arr[N - 1]);
   return returnVal;
+}
+String directionToString(Direction dir) {
+  if (dir == HOLD) return "H";
+  if (dir == ASCENDING) return "A";
+  if (dir == DESCENDING) return "D";
+  return "";
 }
 
 void setup() {
@@ -189,7 +207,12 @@ void setup() {
 
 
   analogWriteFrequency(200000); // default PWM frequency is 1kHz, change it to 2kHz
-  analogWrite(PB4, 0); // 127 means 50% duty cycle so a square wave
+  pinMode(D5, OUTPUT);
+  pinMode(D6, OUTPUT);
+  // digitalWrite(D5, LOW);
+  // digitalWrite(D5, LOW);
+  analogWrite(D5, 0); // 127 means 50% duty cycle so a square wave
+  analogWrite(D6, 0); // 127 means 50% duty cycle so a square wave
   
   serial_commands_.SetDefaultHandler(cmd_unrecognized);
   serial_commands_.AddCommand(&cmd_readTemperature_on);
@@ -203,6 +226,7 @@ void setup() {
   serial_commands_.AddCommand(&cmd_reset);
   serial_commands_.AddCommand(&cmd_start1);
   serial_commands_.AddCommand(&cmd_start2);
+  serial_commands_.AddCommand(&cmd_startHeater);
   serial_commands_.AddCommand(&cmd_setTimelimit);
 
   i2c_flex1.begin();
@@ -240,47 +264,9 @@ void setup() {
 
   while (!Serial.available()) {}
   Serial.println("initialized");
-
-  // while(true){
-
-  //   for (auto &&sensor : sensors){
-  //     if (sensor->getStatus()) {
-  //       if (sensor->getSensorCat() == SENSOR_TEMP) {
-  //         Serial.print("TEMP");
-  //       }
-  //       if (sensor->getSensorCat() == SENSOR_PROX) {
-  //         Serial.print("PROX");
-  //       }
-  //       if (sensor->getSensorCat() == SENSOR_CAP) {
-  //         Serial.print("CAPF");
-  //       }
-  //       Serial.print(sensor->getSensorId());
-  //       Serial.print(": ");
-  //       Serial.println(sensor->readValue(false));
-  //     }
-  //   }
-  //   delay(500);
-  // }
-
-  // delay(10);
-  // peltier = std::make_unique<PeltierController>(PinName(D3), PeltierController::ARDUINOPWM);
-  // initial_light_value = (uint16_t) (0.9 * light_sensor2->getProximity());
-  // Serial.print("Initial Light Value: ");
-  // Serial.println(initial_light_value);
-  // controlPeltier = true;
-  // delay(10);
-
-  // Ser.begin(19200);
-  // delay(1);
-  // Ser.println("*IDN?");
-  // while (!Ser.available()){
-  //   delay(500);
-  //   Serial.println("wait");
-  // }
-  // String str = Serial.readString();
-  // str.trim();
-  // Serial.println(str);
 }
+
+
 
 void routine_fall1rise1() {
   // Selfcheck
@@ -353,18 +339,13 @@ void routine_fall1rise1() {
   const uint8_t numStates = 7;
   // deltaTperS == 0 defines hold, please make sure proper holdTime is set at respective array index
   const float deltaTperSs[numStates] = {0, -0.8, 0, 1, 0, -0.1, 0};
-  const float T_targets[numStates] = {0, 5.5, 5.5, 13.0, 13.0, 5.5, 5.5};
-  const uint32_t holdTimes[numStates] = {0, 0, 4000, 0, 500, 0, 4000};
+  const float T_targets[numStates] = {0, 10, 10, 18.0, 18.0, 10, 10};
+  const uint32_t holdTimes[numStates] = {1000, 0, 4000, 0, 500, 0, 4000};
 
   uint8_t state = 0;
   bool next_state = true;
   bool initialized = false;
 
-  enum Direction {
-    HOLD,
-    ASCENDING,
-    DESCENDING
-  };
   Direction direction = DESCENDING;
 
   const String info_head = "routine_name duration period PID T hum cap prox dTs T_targets holdTimes kp ki kd info";
@@ -385,7 +366,7 @@ void routine_fall1rise1() {
     uint32_t period_start = millis();
 
     // disable PWM for signal integrity
-    analogWrite(PB4, 0);
+    analogWrite(D5, 0);
     delayMicroseconds(100);
 
     // initiate measurements
@@ -501,7 +482,7 @@ void routine_fall1rise1() {
     else if (pwm_factor < 0) pwm_factor = 0;
 
     // Turn PWM back on using new value
-    analogWrite(PB4, (uint8_t)pwm_factor);
+    analogWrite(D5, (uint8_t)pwm_factor);
 
     // Print status
     Serial.print(T_next + (String)" " + T_actual + " " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + T_sensor[4] + " " + humidity[0] + " "  + humidity[1] + " "  + humidity[2] + " "  + pressure + " " + proportional + " " + integrator + " " + differentiator + " " + error + " " + pwm_factor + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
@@ -519,7 +500,232 @@ void routine_fall1rise1() {
   }
 
   // Force PWM off
-  analogWrite(PB4, 0);
+  analogWrite(D5, 0);
+}
+
+
+void routine_controlToCap() {
+  const uint32_t periodMS = 200;
+  const float periodS = (float) periodMS / 1000; 
+  float deltaTperS = 0.0;
+  float deltaTperPeriod = 0.0;
+  float T_next = 0.0;
+  float T_actual = __FLT_MAX__;
+  float T_sensor[5];
+  float humidity[3];
+  float pressure;
+  float proximity[4];
+  float capacitance = 0.0;
+  uint8_t numTempReadings = 0;
+
+  float error = 0.0;
+  float prev_error = 0.0;
+  const float Kp = 20; // 27
+  const float Ki = 5;
+  const float Kd = 30;
+  const float limit = 200.0;
+  float pwm_factor = 0.0;
+  float proportional = 0.0;
+  float integrator = 0.0;
+	float differentiator = 0.0;
+
+  const float T_lowerLimOs = -20.0;
+  const float T_upperLimOs = +1.5;
+  const float C_lowerCtrlF = 0.90;
+  const float C_upperCtrlF = 0.95;
+  const uint8_t numStates = 9;
+  // deltaTperS == 0 defines hold, please make sure proper holdTime is set at respective array index
+  // const Direction directions[numStates] = {HOLD, DESCENDING_C, HOLD_DESCENDING, ASCENDING_T, HOLD_ASCENDING}
+  const float deltaTperSs[numStates] = {0, -0.2, 0, 0.2, 0, -0.4, 0, 0.2, 0};
+  const uint32_t holdTimes[numStates] = {5000, 0, 1000, 0, 2000, 0, 2000, 0, 4000};
+
+  float T_lowerLim;
+  float T_upperLim;
+  float C_lowerCtrl;
+  float C_upperCtrl;
+
+  uint8_t state = 0;
+  bool next_state = true;
+  bool initialized = false;
+
+  Direction direction = DESCENDING;
+
+  const String info_head = "routine_name duration period PID T hum cap prox dTs holdTimes kp ki kd info";
+  const String info = "main_controlToCap - 0.2s x x x x " + 
+                      arrayToString(deltaTperSs) + " " +
+                      arrayToString(holdTimes) + " " +
+                      Kp + " " + Ki + " " + Kd + " " + 
+                      "stability test (slow +dT)";
+  Serial.println(info_head);
+  Serial.println(info);
+  const String cols = "Ttarget Tavg T0 T1 T2 T3 T4 H0 H1 H2 P2 DIR P I D Error PID PROX0 PROX3 CAP";
+
+  uint32_t time_checkpoint;
+  bool finished = false;
+
+  while(true) {
+    uint32_t period_start = millis();
+
+    // disable PWM for signal integrity
+    analogWrite(D5, 0);
+    analogWrite(D6, 0);
+    delayMicroseconds(500);
+
+    // initiate measurements
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_CAP) {
+          sensor->measure(false);
+          capacitance = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_PROX) {
+          sensor->measure(false);
+        }
+        else {
+          sensor->measure(true);
+        }
+      }
+      delayMicroseconds(50);
+    }
+
+    // wait for measurements to finish
+    delay(10);
+
+    // read current temperature and sensor values
+    numTempReadings = 0;
+    T_actual = 0;
+    
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_TEMP && id < 4) {
+          T_sensor[id] = sensor->readValue(false);
+          T_actual += T_sensor[id];
+          numTempReadings++;
+        }
+        if (sensor->getSensorCat() == SENSOR_TEMP && id == 4) {
+          T_sensor[id] = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_HUM) {
+          humidity[id] = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_PROX && (id == 0 || id == 3)) {
+          proximity[id] = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_AMB) {
+          humidity[id + 2] = sensor->readValue(false, Sensor::DataType::HUM);
+          pressure = sensor->readValue(false, Sensor::DataType::PRESS, false);
+        }
+      }
+    }
+    T_actual = T_actual / numTempReadings;
+
+    // initialize T_next and set time_checkpoint for use in hold states
+    // also set direction and deltaTperPeriod (not really necessary but provides readability)
+    if (next_state) {
+      if (!initialized) {
+        T_next = T_actual;
+        T_lowerLim = T_actual + T_lowerLimOs;
+        T_upperLim = T_actual + T_upperLimOs;
+        C_lowerCtrl = capacitance * C_lowerCtrlF;
+        C_upperCtrl = capacitance * C_upperCtrlF;
+        Serial.println((String)"Limits: " + T_lowerLim + " " + T_upperLim + " " + C_lowerCtrl + " " + C_upperCtrl);
+        initialized = true;
+      }
+
+      deltaTperS = deltaTperSs[state];
+      deltaTperPeriod = deltaTperS * periodS;
+      if (deltaTperPeriod < 0.0) {
+        direction = DESCENDING;
+      }
+      else if (deltaTperPeriod > 0.0) {
+        direction = ASCENDING;
+      }
+      else {
+        direction = HOLD;
+      }
+      next_state = false;
+      time_checkpoint = period_start;
+    }
+
+    // Calculate next target temperature
+    T_next = T_next + deltaTperPeriod;
+
+    // Limit T_next
+    if (direction == DESCENDING && T_next < T_lowerLim) {
+      T_next = T_lowerLim;
+    }
+    if (direction == ASCENDING && T_next > T_upperLim) {
+      T_next = T_upperLim;
+    }
+
+    // Check if T_target or holdTime has been reached and continue to next_state (or finish)
+    if ((direction == DESCENDING && capacitance < C_lowerCtrl) ||
+        (direction == ASCENDING && capacitance > C_upperCtrl) ||
+        (direction == HOLD && (period_start - time_checkpoint) >= holdTimes[state])) {
+      state += 1;
+      if (state < numStates) next_state = true;
+      else finished = true;
+    }
+
+    // Break loop if execution is finished
+    if (finished) {
+      break;
+    }
+
+    // Calculate error between next target temperature and current temperature
+    prev_error = error;
+    error = T_next - T_actual;
+
+    // Calculate PID parts using the error
+    proportional = - (error * Kp);
+    integrator = integrator - (0.5 * Kp * periodS * (error + prev_error));
+    if (integrator > 160) integrator = 160;   // anti wind-up for integrator
+    else if (integrator < 0) integrator = 0;
+    differentiator = - (Kd * (error - prev_error) / periodS);
+
+    // Turn PID parts into pulse width and set limit
+    pwm_factor = proportional + integrator + differentiator;
+    float pwm_factor_cooler = pwm_factor;
+    if (pwm_factor_cooler > limit) pwm_factor_cooler = limit;
+    else if (pwm_factor_cooler < 0) pwm_factor_cooler = 0;
+
+    // Turn PWM back on using new value
+    analogWrite(D5, (uint8_t)pwm_factor_cooler);
+
+    // heat for faster condensation
+    if (direction == ASCENDING) {
+      float pwm_factor_heater = 10 * pwm_factor;
+      if (pwm_factor_heater < -150) pwm_factor_heater = 150;
+      else if (pwm_factor_heater < 0) pwm_factor_heater = -pwm_factor_heater;
+      else pwm_factor_heater = 0;
+      analogWrite(D6, (uint8_t)pwm_factor_heater);
+    }
+
+    // Print status
+    const String printString = 
+        T_next + (String)" " + T_actual + " " + 
+        T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + T_sensor[4] + " " + 
+        humidity[0] + " "  + humidity[1] + " "  + humidity[2] + " "  + pressure + " " + 
+        directionToString(direction) + " " + proportional + " " + integrator + " " + differentiator + " " + error + " " + pwm_factor + " " + 
+        proximity[0] + " " + proximity[3] + " " + capacitance; 
+    Serial.println(printString);
+
+    // Timing (use micros?)
+    uint32_t period_end = millis();
+    uint32_t elapsed = period_end - period_start;
+    if (elapsed < periodMS) {
+      delay(periodMS - elapsed);
+    }
+    else {
+      Serial.println((String)"TIMING: " + elapsed);
+    }
+  }
+
+  // Force PWM off
+  analogWrite(D5, 0);
+  analogWrite(D6, 0);
 }
 
 
@@ -609,7 +815,11 @@ void routine_nopid30min() {
   }
 }
 
-
+void routine_heater() {
+  analogWrite(D6, 100);
+  delay(2000);
+  analogWrite(D6, 0);
+}
 
 #define PERIOD 250000    //us
 
@@ -619,12 +829,16 @@ void loop() {
   uint32_t period_start = micros();
   
   if (startPrimaryRoutine) {
-    routine_fall1rise1();
+    routine_controlToCap();
     startPrimaryRoutine = false;
   }
   if (startSecondaryRoutine) {
     routine_nopid30min();
     startSecondaryRoutine = false;
+  }
+  if (startHeaterRoutine) {
+    routine_heater();
+    startHeaterRoutine = false;
   }
 
   uint32_t period_end = micros();
