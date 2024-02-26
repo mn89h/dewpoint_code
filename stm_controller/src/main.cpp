@@ -529,14 +529,15 @@ void routine_controlToCap() {
   float integrator = 0.0;
 	float differentiator = 0.0;
 
+  const float C_riseLimit = 6500.0;
   const float T_lowerLimOs = -20.0;
   const float T_upperLimOs = +1.5;
   const float C_lowerCtrlF = 0.90;
   const float C_upperCtrlF = 0.95;
-  const uint8_t numStates = 9;
+  const uint8_t numStates = 11;
   // deltaTperS == 0 defines hold, please make sure proper holdTime is set at respective array index
   // const Direction directions[numStates] = {HOLD, DESCENDING_C, HOLD_DESCENDING, ASCENDING_T, HOLD_ASCENDING}
-  const float deltaTperSs[numStates] = {0, -0.2, 0, 0.2, 0, -0.4, 0, 0.2, 0};
+  const float deltaTperSs[numStates] = {0, -0.2, 0, 1, 0, -0.4, 0, 1, 0};
   const uint32_t holdTimes[numStates] = {5000, 0, 1000, 0, 2000, 0, 2000, 0, 4000};
 
   float T_lowerLim;
@@ -663,8 +664,10 @@ void routine_controlToCap() {
     // Check if T_target or holdTime has been reached and continue to next_state (or finish)
     if ((direction == DESCENDING && capacitance < C_lowerCtrl) ||
         (direction == ASCENDING && capacitance > C_upperCtrl) ||
+        (direction == ASCENDING && capacitance > C_riseLimit) ||
         (direction == HOLD && (period_start - time_checkpoint) >= holdTimes[state])) {
       state += 1;
+      if (direction == ASCENDING && capacitance > C_riseLimit) T_upperLim = T_actual;
       if (state < numStates) next_state = true;
       else finished = true;
     }
