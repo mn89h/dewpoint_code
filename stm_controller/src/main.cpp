@@ -29,7 +29,7 @@ bool controlPeltier;
 bool startPrimaryRoutine;
 bool startSecondaryRoutine;
 bool startHeaterRoutine;
-uint32_t timelimitMS = 200;
+uint32_t timelimitMS = 2000;
 int readTemperatureSamples;
 int currentTemperatureSample = 0;
 uint16_t initial_light_value;
@@ -209,10 +209,10 @@ void setup() {
   analogWriteFrequency(200000); // default PWM frequency is 1kHz, change it to 2kHz
   pinMode(D5, OUTPUT);
   pinMode(D6, OUTPUT);
-  // digitalWrite(D5, LOW);
-  // digitalWrite(D5, LOW);
-  analogWrite(D5, 0); // 127 means 50% duty cycle so a square wave
-  analogWrite(D6, 0); // 127 means 50% duty cycle so a square wave
+  digitalWrite(D5, LOW);
+  digitalWrite(D6, LOW);
+  // analogWrite(D5, 0); // 127 means 50% duty cycle so a square wave
+  // analogWrite(D6, 0); // 127 means 50% duty cycle so a square wave
   
   serial_commands_.SetDefaultHandler(cmd_unrecognized);
   serial_commands_.AddCommand(&cmd_readTemperature_on);
@@ -503,6 +503,24 @@ void routine_fall1rise1() {
   analogWrite(D5, 0);
 }
 
+bool shiftInsertAndCompare(float arr[], int n, float value, float compareValue) {
+  bool allElementsLarger = true;
+
+  // Copy values from original array, shifted right
+  for(int i = n-1; i > 0; i--) {
+    arr[i] = arr[i-1];
+    if (arr[i] <= compareValue) {
+      allElementsLarger = false;
+    }
+  }
+  arr[0] = value;
+  if (arr[0] <= compareValue) {
+    allElementsLarger = false;
+  }
+  return allElementsLarger;
+}
+
+
 
 void routine_controlToCap() {
   const uint32_t periodMS = 200;
@@ -529,16 +547,17 @@ void routine_controlToCap() {
   float integrator = 0.0;
 	float differentiator = 0.0;
 
-  const float C_riseLimit = 6500.0;
-  const float T_lowerLimOs = -20.0;
+  float C_riseLimit = 10000.0;
+  const float T_lowerLimOs = -25.0;
   const float T_upperLimOs = +1.5;
   const float C_lowerCtrlF = 0.90;
   const float C_upperCtrlF = 0.95;
-  const uint8_t numStates = 11;
+  const uint8_t numStates = 15;
   // deltaTperS == 0 defines hold, please make sure proper holdTime is set at respective array index
   // const Direction directions[numStates] = {HOLD, DESCENDING_C, HOLD_DESCENDING, ASCENDING_T, HOLD_ASCENDING}
-  const float deltaTperSs[numStates] = {0, -0.2, 0, 1, 0, -0.4, 0, 1, 0};
-  const uint32_t holdTimes[numStates] = {5000, 0, 1000, 0, 2000, 0, 2000, 0, 4000};
+  const float deltaTperSs[numStates] = {0, -0.5, 0, 1, 0, -0.2, 0, 0.3, 0, -0.1, 0, 0.2, 0, -0.1, 0};
+  const uint32_t holdTimes[numStates] = {5000, 0, 2000, 0, 1000, 0, 2000, 0, 1000, 0, 2000, 0, 1000, 0, 4000};
+  const uint32_t timeoutLim = 2000;
 
   float T_lowerLim;
   float T_upperLim;
@@ -562,7 +581,11 @@ void routine_controlToCap() {
   const String cols = "Ttarget Tavg T0 T1 T2 T3 T4 H0 H1 H2 P2 DIR P I D Error PID PROX0 PROX3 CAP";
 
   uint32_t time_checkpoint;
+  bool timeout_check = false;
   bool finished = false;
+  float pwm_factor_cooler = 0.0;
+  float lastCs[5] = {0, 0, 0, 0, 0};
+  float minC = 10000.0;
 
   while(true) {
     uint32_t period_start = millis();
@@ -592,6 +615,16 @@ void routine_controlToCap() {
 
     // wait for measurements to finish
     delay(10);
+    // analogWrite(D5, (uint8_t)pwm_factor_cooler);
+
+    // // reduce rising capacitance threshold
+    // if (capacitance < minC) {
+    //   minC = capacitance;
+    // }
+    // bool risingTrend = shiftInsertAndCompare(lastCs, 5, capacitance, minC);
+    // if (direction == ASCENDING && risingTrend && C_upperCtrl > capacitance) {
+    //   C_upperCtrl = capacitance;
+    // }
 
     // read current temperature and sensor values
     numTempReadings = 0;
@@ -627,7 +660,8 @@ void routine_controlToCap() {
     if (next_state) {
       if (!initialized) {
         T_next = T_actual;
-        T_lowerLim = T_actual + T_lowerLimOs;
+        // T_lowerLim = T_actual + T_lowerLimOs;
+        T_lowerLim = -2.0;
         T_upperLim = T_actual + T_upperLimOs;
         C_lowerCtrl = capacitance * C_lowerCtrlF;
         C_upperCtrl = capacitance * C_upperCtrlF;
@@ -648,6 +682,7 @@ void routine_controlToCap() {
       }
       next_state = false;
       time_checkpoint = period_start;
+      timeout_check = false;
     }
 
     // Calculate next target temperature
@@ -656,9 +691,15 @@ void routine_controlToCap() {
     // Limit T_next
     if (direction == DESCENDING && T_next < T_lowerLim) {
       T_next = T_lowerLim;
+      time_checkpoint = period_start;
+      timeout_check = true;
+      Serial.println("to1");
     }
     if (direction == ASCENDING && T_next > T_upperLim) {
       T_next = T_upperLim;
+      time_checkpoint = period_start;
+      timeout_check = true;
+      Serial.println("to2");
     }
 
     // Check if T_target or holdTime has been reached and continue to next_state (or finish)
@@ -666,16 +707,24 @@ void routine_controlToCap() {
         (direction == ASCENDING && capacitance > C_upperCtrl) ||
         (direction == ASCENDING && capacitance > C_riseLimit) ||
         (direction == HOLD && (period_start - time_checkpoint) >= holdTimes[state])) {
-      state += 1;
       if (direction == ASCENDING && capacitance > C_riseLimit) T_upperLim = T_actual;
-      if (state < numStates) next_state = true;
-      else finished = true;
+      state += 1;
+      next_state = true;
     }
-
+    else if (timeout_check && (period_start - time_checkpoint) >= timeoutLim) {
+      Serial.println("ms");
+      state += 1;
+      next_state = true;
+    }
     // Break loop if execution is finished
-    if (finished) {
+    if (state >= numStates) {
+      finished = true;
       break;
     }
+    // // Remove usage of rise limit due to possible too early leave of ASCENDING state
+    // if (capacitance < 6500.0) {
+    //   C_riseLimit = 6500.0;
+    // }
 
     // Calculate error between next target temperature and current temperature
     prev_error = error;
@@ -690,7 +739,7 @@ void routine_controlToCap() {
 
     // Turn PID parts into pulse width and set limit
     pwm_factor = proportional + integrator + differentiator;
-    float pwm_factor_cooler = pwm_factor;
+    pwm_factor_cooler = pwm_factor;
     if (pwm_factor_cooler > limit) pwm_factor_cooler = limit;
     else if (pwm_factor_cooler < 0) pwm_factor_cooler = 0;
 
