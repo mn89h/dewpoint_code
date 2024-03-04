@@ -69,7 +69,7 @@ bool CapacitorReadout::init() {
     // To reduce minimum frequency, it is possible to increase prescaler. But this is at a cost of precision.
     // The maximum frequency depends on processing of the interruption and thus depend on board used
     // Example on Nucleo_L476RG with systemClock at 80MHz the interruption processing is around 4,5 microseconds and thus Max frequency is around 220kHz
-    uint32_t PrescalerFactor = 1;
+    uint32_t PrescalerFactor = 2;
     timer->setPrescaleFactor(PrescalerFactor);
     timer->setOverflow(0xffff); // Max Period value to have the largest possible time to detect rising edge and avoid timer rollover
     // TIM4->ARR = 0xefffffff; // basically we extend the count to 32 bits, allowing the measurement of much lower frequencies.
@@ -84,12 +84,12 @@ bool CapacitorReadout::init() {
 }
 
 void CapacitorReadout::wait() {
-  delay(numSamples - 1);      // delay for x ms (assuming minimum frequency is 1 kHz)
+  delayMicroseconds((numSamples - 1) * 333);      // delay for x ms (assuming minimum frequency is 1 kHz)
 }
 
 bool CapacitorReadout::measure(bool asyncMode) {
     if(!asyncMode) {
-      delay(1);               // delay before 
+      delayMicroseconds(500);               // delay before 
     }
     ignoreMeasurement = false;
     timer->resume();
@@ -118,7 +118,9 @@ bool CapacitorReadout::measure(bool asyncMode) {
           used_samples--;
           counted_ticks -= sorted_ticks[i];
         }
+        // Serial.print((String)sorted_ticks[i] + " ");
       }
+      // Serial.println();
 
       // // using average
       // uint32_t average = counted_ticks / used_samples;
