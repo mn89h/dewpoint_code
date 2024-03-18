@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+Visualization of initial capacitance and luminance values over all measurements 
 Created on Sun Mar  3 18:41:43 2024
 
 @author: malte
@@ -28,6 +29,7 @@ folder_path = 'C:/Users/malte/Documents/master/measurements/thesis'
 names = []
 capacitances = []
 luminances = []
+luminances2 = []
 
 # Loop through each file in the folder
 for file_name in os.listdir(folder_path):
@@ -41,6 +43,7 @@ for file_name in os.listdir(folder_path):
             # Read the first five rows of the CSV file
             c_values = []
             l_values = []
+            l2_values = []
             for _ in range(5):
                 row = next(csv_reader, None)
                 if row is None:
@@ -49,8 +52,10 @@ for file_name in os.listdir(folder_path):
                 # Get the last column value
                 c_values.append(float(row[-1]))
                 l_values.append(float(row[-2]))
+                l2_values.append(float(row[-3]))
             capacitances.append(c_values)
             luminances.append(l_values)
+            luminances2.append(l2_values)
 
 capacitances_mean = np.empty(len(capacitances))
 for i, arr in enumerate(capacitances):
@@ -60,9 +65,14 @@ luminances_mean = np.empty(len(luminances))
 for i, arr in enumerate(luminances):
     luminances_mean[i] = np.mean(arr)
     
+luminances2_mean = np.empty(len(luminances2))
+for i, arr in enumerate(luminances2):
+    luminances2_mean[i] = np.mean(arr)
+    
 
 c_matrix = capacitances_mean.reshape(3, 4)
 l_matrix = luminances_mean.reshape(3, 4)
+l2_matrix = luminances2_mean.reshape(3, 4)
 
   
 # Get saturation water vapor pressure in hPa for all temperatures
@@ -105,9 +115,10 @@ y2 = [[get_AH(rh/100, t) for rh in y1[i_t]] for i_t, t in enumerate(x)]
 print(y2)
 z1 = c_matrix  # Provided values
 z2 = l_matrix
+z3 = l2_matrix
 
 # Create a figure and a 3D axis
-fig, ax = plt.subplots(2,2, figsize=SH.set_size(SH.TEXTWIDTH_MASTER * PLOTSIZE))
+fig, ax = plt.subplots(3,2, figsize=SH.set_size(SH.TEXTWIDTH_MASTER * PLOTSIZE, 1, (1,1), 0.8), layout='constrained')
 colors = [SH.IES_BLUE_100, SH.IES_YELLOW_100, SH.IES_RED_100]
 markers = [['s', 's', 'o', 'o'], ['s', 'o', 'o', 'o'], ['s', 'o', 'o', 'o']]
 
@@ -115,8 +126,10 @@ markers = [['s', 's', 'o', 'o'], ['s', 'o', 'o', 'o'], ['s', 'o', 'o', 'o']]
 for i, xi in enumerate(x):
     ax[0,0].plot(y1[i], z1[i], c=colors[i], zorder=1)
     ax[1,0].plot(y1[i], z2[i], c=colors[i], zorder=1)
+    ax[2,0].plot(y1[i], z3[i], c=colors[i], zorder=1)
     SH.mscatter(y1[i], z1[i], c=colors[i], m=markers[i], ax=ax[0,0], zorder=2)
     SH.mscatter(y1[i], z2[i], c=colors[i], m=markers[i], ax=ax[1,0], zorder=2)
+    SH.mscatter(y1[i], z3[i], c=colors[i], m=markers[i], ax=ax[2,0], zorder=2)
     # ax[0,0].scatter(y1[i], z1[i], c=colors[i], marker=markers[i])
     # ax[1,0].scatter(y1[i], z2[i], c=colors[i])
 
@@ -124,26 +137,34 @@ for i, xi in enumerate(x):
 for i, xi in enumerate(x):
     ax[0,1].plot(y2[i], z1[i], c=colors[i], zorder=1)
     ax[1,1].plot(y2[i], z2[i], c=colors[i], zorder=1, label='\\qty{' + str(xi) +'}{\celsius}')
+    ax[2,1].plot(y2[i], z3[i], c=colors[i], zorder=1, label='\\qty{' + str(xi) +'}{\celsius}')
     SH.mscatter(y2[i], z1[i], c=colors[i], m=markers[i], ax=ax[0,1], zorder=1)
     SH.mscatter(y2[i], z2[i], c=colors[i], m=markers[i], ax=ax[1,1], zorder=1)
+    SH.mscatter(y2[i], z3[i], c=colors[i], m=markers[i], ax=ax[2,1], zorder=1)
     # ax[0,1].scatter(y2[i], z1[i], c=colors[i])
     # ax[1,1].scatter(y2[i], z2[i], label=str(xi) + '°C', c=colors[i])
 
 # Set labels for each axis
-ax[0,0].set_ylabel('Frequency [\\unit{\hertz}]')
-ax[1,0].set_ylabel('Light Value')
-ax[1,0].set_xlabel('Relative Humidity [\\unit{\percent}]')
-ax[1,1].set_xlabel('Absolute Humidity [\\unit{\g \per \m^3}]')
+ax[0,0].set_ylabel('IDE Capacitor\nFrequency [\\unit{\hertz}]')
+ax[1,0].set_ylabel('VCNL4040\nLight Intensity')
+ax[2,0].set_ylabel('VCNL36825T\nLight Intensity')
+# ax[1,0].set_xlabel('Relative Humidity [\\unit{\percent}]')
+# ax[1,1].set_xlabel('Absolute Humidity [\\unit{\g \per \m^3}]')
+ax[2,0].set_xlabel('Relative Humidity [\\unit{\percent}]')
+ax[2,1].set_xlabel('Absolute Humidity [\\unit{\g \per \m^3}]')
 
 ax[0,1].yaxis.set_ticklabels([])
 ax[1,1].yaxis.set_ticklabels([])
+ax[2,1].yaxis.set_ticklabels([])
 
-ax[1,1].legend()
+ax[2,1].legend()
 
 ax[0,0].margins(0.05, 0.1)
 ax[0,1].margins(0.05, 0.1)
 ax[1,0].margins(0.05, 0.1)
 ax[1,1].margins(0.05, 0.1)
+ax[2,0].margins(0.05, 0.1)
+ax[2,1].margins(0.05, 0.1)
 fig.tight_layout()
 
 

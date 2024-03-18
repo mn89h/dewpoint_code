@@ -6,7 +6,10 @@ Created on Fri Mar  1 10:19:06 2024
 """
 import matplotlib.pyplot as plt
 
+GOLDENRATIO = (5**.5 - 1) / 2
 TEXTWIDTH_MASTER = 418.25555
+GREY = '808080'
+BLACK = '000000'
 IES_BLUE = '004c8b'
 IES_RED = 'b81068'
 IES_YELLOW = 'f5a301'
@@ -57,7 +60,7 @@ def update_pyplot_rcParams(style=MASTER_STYLE_NORMAL):
 
 
 @staticmethod
-def set_size(width_pt=TEXTWIDTH_MASTER, fraction=1, subplots=(1, 1)):
+def set_size(width_pt=TEXTWIDTH_MASTER, fraction=1, subplots=(1, 1),  ratio = GOLDENRATIO):
     """Set figure dimensions to sit nicely in our document.
 
     Parameters
@@ -79,7 +82,7 @@ def set_size(width_pt=TEXTWIDTH_MASTER, fraction=1, subplots=(1, 1)):
     inches_per_pt = 1 / 72.27
 
     # Golden ratio to set aesthetic figure height
-    golden_ratio = (5**.5 - 1) / 2
+    golden_ratio = ratio
 
     # Figure width in inches
     fig_width_in = fig_width_pt * inches_per_pt
