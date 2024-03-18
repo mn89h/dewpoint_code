@@ -29,7 +29,7 @@ bool controlPeltier;
 bool startPrimaryRoutine;
 bool startSecondaryRoutine;
 bool startHeaterRoutine;
-uint32_t timelimitMS = 2000;
+uint32_t timelimitMS = 600000;
 int readTemperatureSamples;
 int currentTemperatureSample = 0;
 uint16_t initial_light_value;
@@ -241,10 +241,10 @@ void setup() {
   sensors.push_back(std::make_unique<Sensor>((void*) new AS6221(&i2c_flex1, AS6221_ADDR_A), typeid(AS6221), "AS6221:F1", SENSOR_TEMP, 1, &i2c_flex1, I2CSWITCH_ADDR, 1, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new AS6221(&i2c_flex1, AS6221_ADDR_B), typeid(AS6221), "AS6221:F2", SENSOR_TEMP, 2, &i2c_flex1, I2CSWITCH_ADDR, 2, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new AS6221(&i2c_flex1, AS6221_ADDR_A), typeid(AS6221), "AS6221:F3", SENSOR_TEMP, 3, &i2c_flex1, I2CSWITCH_ADDR, 3, true));
-  sensors.push_back(std::make_unique<Sensor>((void*) new AS6221(&i2c_rigid, AS6221_ADDR_A), typeid(AS6221), "AS6221:B0", SENSOR_TEMP, 4, &i2c_rigid, I2CSWITCH_ADDR, -1, false));
+  sensors.push_back(std::make_unique<Sensor>((void*) new AS6221(&i2c_rigid, AS6221_ADDR_A), typeid(AS6221), "AS6221:B0", SENSOR_TEMP, 4, &i2c_rigid, I2CSWITCH_ADDR, -1, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL36825T(&i2c_rigid, VCNL36825T_ADDR), typeid(VCNL36825T), "VCNL36825T:CENTER", SENSOR_PROX, 0, &i2c_rigid, I2CSWITCH_ADDR, 0, true));
-  sensors.push_back(std::make_unique<Sensor>((void*) new VCNL36825T(&i2c_rigid, VCNL36825T_ADDR), typeid(VCNL36825T), "VCNL36825T:BORDER", SENSOR_PROX, 1, &i2c_rigid, I2CSWITCH_ADDR, 1, false));
-  sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:BORDER", SENSOR_PROX, 2, &i2c_rigid, I2CSWITCH_ADDR, 2, false));
+  sensors.push_back(std::make_unique<Sensor>((void*) new VCNL36825T(&i2c_rigid, VCNL36825T_ADDR), typeid(VCNL36825T), "VCNL36825T:BORDER", SENSOR_PROX, 1, &i2c_rigid, I2CSWITCH_ADDR, 1, true));
+  sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:BORDER", SENSOR_PROX, 2, &i2c_rigid, I2CSWITCH_ADDR, 2, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new VCNL4040(&i2c_rigid, VCNL4040_ADDR), typeid(VCNL4040), "VCNL4040:CENTER", SENSOR_PROX, 3, &i2c_rigid, I2CSWITCH_ADDR, 3, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new SHT45(&i2c_flex1), typeid(SHT45), "SHT45:BORDER", SENSOR_HUM, 0, &i2c_flex1, I2CSWITCH_ADDR, 0, true));
   sensors.push_back(std::make_unique<Sensor>((void*) new SHT45(&i2c_flex1), typeid(SHT45), "SHT45:CENTER", SENSOR_HUM, 1, &i2c_flex1, I2CSWITCH_ADDR, 2, true));
@@ -836,7 +836,7 @@ void routine_controlToCap() {
 
 
 void routine_nopid30min() {
-  const uint32_t periodMS = 200;
+  const uint32_t periodMS = 100;
   const float periodS = (float) periodMS / 1000; 
   float T_sensor[4];
   float T_actual = 0.0;
@@ -868,6 +868,9 @@ void routine_nopid30min() {
           sensor->measure(false);
           capacitance = sensor->readValue(false);
         }
+        else if (sensor->getSensorCat() == SENSOR_PROX) {
+          sensor->measure(false);
+        }
         else {
           sensor->measure(true);
         }
@@ -876,7 +879,7 @@ void routine_nopid30min() {
     }
 
     // wait for measurements to finish
-    delay(20);
+    delay(30);
 
     // read current temperature and sensor values
     numTempReadings = 0;
@@ -893,7 +896,7 @@ void routine_nopid30min() {
         else if (sensor->getSensorCat() == SENSOR_HUM) {
           humidity[id] = sensor->readValue(false);
         }
-        else if (sensor->getSensorCat() == SENSOR_PROX && (id == 0 || id == 3)) {
+        else if (sensor->getSensorCat() == SENSOR_PROX) {
           proximity[id] = sensor->readValue(false);
         }
         else if (sensor->getSensorCat() == SENSOR_AMB) {
@@ -905,7 +908,139 @@ void routine_nopid30min() {
     T_actual = T_actual / numTempReadings;
 
     // Print status
-    Serial.print(T_actual + (String)" " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity[0] + " " + humidity[1] + " " + humidity[2] + " " + pressure + " " + proximity[0] + " " + proximity[3] + " " + capacitance);
+    Serial.print(T_actual + (String)" " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity[0] + " " + humidity[1] + " " + humidity[2] + " " + pressure + " " + proximity[0] + " " + proximity[1] + " " + proximity[2] + " " + proximity[3] + " " + capacitance);
+    Serial.println();
+
+    if (next_period > routine_start + runduration_ms) break;
+
+    // Timing (use micros?)
+    uint32_t period_end = millis();
+    if (period_end < next_period) {
+      delay(next_period - period_end);
+    }
+    else {
+      Serial.println((String)"TIMING: " + ((int32_t) next_period - period_end));
+    }
+  }
+}
+
+void routine_pid30min() {
+  const uint32_t periodMS = 100;
+  const float periodS = (float) periodMS / 1000; 
+  float T_sensor[4];
+  float T_actual = 0.0;
+  float T_next = 25.2;
+  float humidity[3];
+  float pressure;
+  float capacitance = 0.0;
+  float proximity[4];
+  uint8_t numTempReadings = 0;
+  uint32_t runduration_ms = 30 * 60 * 1000; // min * s * us
+  if (timelimitMS != 0) {
+    runduration_ms = timelimitMS;
+  }
+
+  
+  float error = 0.0;
+  float prev_error = 0.0;
+  const float Kp = 20; // 27
+  const float Ki = 5;
+  const float Kd = 20;
+  const float limit = 253.0;
+  float pwm_factor = 0.0;
+  float proportional = 0.0;
+  float integrator = 0.0;
+	float differentiator = 0.0;
+  
+  float pwm_factor_cooler = 0.0;
+
+  const String info_head = "routine_name duration period PID T hum cap prox T_target(s) kp ki kd info";
+  const String info = "nopid30min 30min 0.2s - x x x - - - stability test (slow +dT)";
+  Serial.println(info_head);
+  Serial.println(info);
+
+  uint32_t routine_start = millis();
+  uint32_t next_period = routine_start;
+  while(true) {
+    next_period = next_period + periodMS;
+    
+    // initiate measurements
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_CAP) {
+          sensor->measure(false);
+          capacitance = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_PROX) {
+          sensor->measure(false);
+        }
+        else {
+          sensor->measure(true);
+        }
+      }
+      delayMicroseconds(50);
+    }
+
+    // wait for measurements to finish
+    delay(30);
+
+    // read current temperature and sensor values
+    numTempReadings = 0;
+    T_actual = 0;
+    
+    for (auto &&sensor : sensors){
+      if (sensor->getStatus()) {
+        uint8_t id = sensor->getSensorId();
+        if (sensor->getSensorCat() == SENSOR_TEMP && id < 4) {
+          T_sensor[id] = sensor->readValue(false);
+          T_actual += T_sensor[id];
+          numTempReadings++;
+        }
+        else if (sensor->getSensorCat() == SENSOR_HUM) {
+          humidity[id] = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_PROX) {
+          proximity[id] = sensor->readValue(false);
+        }
+        else if (sensor->getSensorCat() == SENSOR_AMB) {
+          humidity[id + 2] = sensor->readValue(false, Sensor::DataType::HUM);
+          pressure = sensor->readValue(false, Sensor::DataType::PRESS, false);
+        }
+      }
+    }
+    T_actual = T_actual / numTempReadings;
+
+    if (T_next > 15.0){
+      T_next = T_next - 1 * periodS;
+    }
+    else {
+      T_next = 15.0;
+    }
+    
+    // Calculate error between next target temperature and current temperature
+    prev_error = error;
+    error = T_next - T_actual;
+
+    // Calculate PID parts using the error
+    proportional = - (error * Kp);
+    integrator = integrator - (0.5 * Kp * periodS * (error + prev_error));
+    if (integrator > 170) integrator = 170;   // anti wind-up for integrator
+    else if (integrator < 0) integrator = 0;
+    differentiator = - (Kd * (error - prev_error) / periodS);
+
+    // Turn PID parts into pulse width and set limit
+    pwm_factor = proportional + integrator + differentiator;
+    pwm_factor_cooler = pwm_factor;
+    if (pwm_factor_cooler > limit) pwm_factor_cooler = limit;
+    else if (pwm_factor_cooler < 0) pwm_factor_cooler = 0;
+    if (capacitance < 3500) pwm_factor_cooler = 0;
+
+    // Turn PWM back on using new value
+    analogWrite(D5, (uint8_t)pwm_factor_cooler);
+
+    // Print status
+    Serial.print(T_next + (String)" " + T_actual + " " + T_sensor[0] + " " + T_sensor[1] + " " + T_sensor[2] + " " + T_sensor[3] + " " + humidity[0] + " " + humidity[1] + " " + humidity[2] + " " + pressure + " " + proximity[0] + " " + proximity[1] + " " + proximity[2] + " " + proximity[3] + " " + capacitance);
     Serial.println();
 
     if (next_period > routine_start + runduration_ms) break;
@@ -939,7 +1074,7 @@ void loop() {
     startPrimaryRoutine = false;
   }
   if (startSecondaryRoutine) {
-    routine_nopid30min();
+    routine_pid30min();
     startSecondaryRoutine = false;
   }
   if (startHeaterRoutine) {
