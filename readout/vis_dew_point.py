@@ -20,7 +20,11 @@ import statistics as stat
 from numpy import diff, gradient
 import matplotlib
 import StyleHelper as SH
-SH.update_pyplot_rcParams()
+import scienceplots
+import matplotlib.ticker as ticker
+plt.style.use(['science','ieee'])
+plt.rcParams.update({'figure.dpi': '100'})
+# SH.update_pyplot_rcParams()
 
 
 class Constants:
@@ -34,11 +38,11 @@ class Constants:
     DYLIM           = [[-100, 100], [-80, 80], [-500, 500]]
     DDYLIM          = [[-20, 20], [-50, 50], [-20, 20]]
     AXLABELPAD      = [14.0,14.0,9.0]
-    AXLABELS        = ['Frequency  [\\unit{\Hz}]\nIDE Capacitor', 'Light Intensity\nVCNL4040', 'Light Intensity\nVCNL36825T']
-    TCOLOR          = SH.IES_BLUE_100
-    REFCOLOR        = SH.color(SH.IES_BLUE, 80)
+    AXLABELS        = ['Frequency (Hz)\nIDE Capacitor', 'Light Intensity\nVCNL4040', 'Light Intensity\nVCNL36825T']
+    TCOLOR          = 'b'
+    REFCOLOR        = 'b'
     SHTCOLOR        = SH.color(SH.IES_BLUE, 50)
-    YCOLORS         = [SH.IES_RED_100 for i in range(3)]
+    YCOLORS         = ['r' for i in range(3)]
     DYCOLORS        = [SH.color(SH.IES_RED, 40) for i in range(3)]
     DDYCOLORS       = [SH.color(SH.IES_RED, 35) for i in range(3)]
     INTERPOLATION   = 1
@@ -408,9 +412,10 @@ def get_dew_points(name, plot_graph=False, T_ref=20, rh_ref=50, smoothing=Consta
     if plot_graph:
         # Create needed amount of subplots
         num_plots = len(Constants.COL_SENSD)
-        print_plots = [0]
+        print_plots = [0,1]
         num_plots = len(print_plots)
-        fig, axT = plt.subplots(num_plots, figsize=SH.set_size(SH.TEXTWIDTH_MASTER * PLOTSIZE, 1, (1,1), 0.5), layout='constrained')
+        # fig, axT = plt.subplots(num_plots, figsize=SH.set_size(SH.TEXTWIDTH_MASTER * PLOTSIZE, 1, (1,1), 0.5), layout='constrained')
+        fig, axT = plt.subplots(num_plots, layout='constrained')
         try:
             iterator = iter(axT)
         except TypeError:
@@ -423,19 +428,19 @@ def get_dew_points(name, plot_graph=False, T_ref=20, rh_ref=50, smoothing=Consta
             paint = Constants.TCOLOR
             axTi.plot(x, y_T[temp_indices[i]], c=paint)
             if i == len(axT) - 1: 
-                axTi.set_xlabel('Time  [\\unit{\s}]')
-            axTi.set_ylabel('Temperature [\\unit{\celsius}]', color=paint)
+                axTi.set_xlabel('Time (s)')
+            axTi.set_ylabel('Temperature ($^{\circ}$C)', color=paint)
             axTi.tick_params('y', colors=paint)
             axTi.grid(axis='y')
-            axTi.axhline(y = T_dew_ref, linestyle='dashed')
+            axTi.axhline(y = T_dew_ref, linestyle='dashed', color=Constants.REFCOLOR)
             axTi.set_ylim(6,26)
             
             crossings = []
             for ind in search_indices:
                 crossings.append(get_next_crossing(y_T[temp_indices[i]], T_dew_ref, True, ind[0], -1))
                 
-            for crossing in crossings:
-                axTi.axvline(x[crossing], linestyle='dashed', color=SH.IES_BLUE_100)
+            # for crossing in crossings:
+            #     axTi.axvline(x[crossing], linestyle='dashed', color=SH.IES_BLUE_100)
                 # csvrow.append(y_SENS[i][crossing])
                 # csvrow.append(dy_SENS[i][crossing])
                 # csvrow.append(ddy_SENS[i][crossing])
@@ -532,8 +537,8 @@ def get_dew_points(name, plot_graph=False, T_ref=20, rh_ref=50, smoothing=Consta
         # axDDDY = []
         for i_axT, axTi in enumerate(axT):
             axY.append(axTi.twinx())
-            axDY.append(axTi.twinx())
-            axDDY.append(axTi.twinx())
+            # axDY.append(axTi.twinx())
+            # axDDY.append(axTi.twinx())
             # axDDDY.append(axTi.twinx())
             
             
@@ -542,46 +547,48 @@ def get_dew_points(name, plot_graph=False, T_ref=20, rh_ref=50, smoothing=Consta
             paint = Constants.YCOLORS[s_plot]
             # paint = Constants.DDYCOLORS[s_plot]
             axY[i].plot(x, y_SENS[s_plot], label = 'a', c=paint)
-            axY[i].set_ylabel(Constants.AXLABELS[s_plot], c=paint, labelpad=Constants.AXLABELPAD[s_plot])
+            axY[i].set_ylabel(Constants.AXLABELS[s_plot], c=paint)
+            # axY[i].set_ylabel(Constants.AXLABELS[s_plot], c=paint, labelpad=Constants.AXLABELPAD[s_plot])
             axY[i].tick_params('y', colors=paint)
-            axY[i].set_ylim(5650,7200)
+            # axY[i].set_ylim(5650,7199)
             
         # Populate capacitance/light dy value graphs
         for i, s_plot in enumerate(print_plots):
             paint = Constants.DYCOLORS[s_plot]
             paint = Constants.YCOLORS[s_plot]
             # axDY[i].plot(x, dy_SENS[s_plot], c=paint, linestyle='solid')
-            axDY[i].set_ylim(Constants.DYLIM[s_plot])
-            axDY[i].set(yticklabels=[])
-            axDY[i].tick_params(left=False, right = False)
-            # axDYi.tick_params('y', colors=paint)
-            # axDYi.yaxis.tick_left()
-            # axDYi.spines['left'].set_position(('axes', 1.0))
-            # axDYi.grid()
+            # axDY[i].set_ylim(Constants.DYLIM[s_plot])
+            # axDY[i].set(yticklabels=[])
+            # axDY[i].tick_params(left=False, right = False)
+            # # axDYi.tick_params('y', colors=paint)
+            # # axDYi.yaxis.tick_left()
+            # # axDYi.spines['left'].set_position(('axes', 1.0))
+            # # axDYi.grid()
             
         # Populate capacitance/light ddy value graphs
         for i, s_plot in enumerate(print_plots):
             paint = Constants.DDYCOLORS[s_plot]
             # paint = Constants.YCOLORS[s_plot]
             # axDDY[i].plot(x, ddy_SENS[s_plot], c=paint, linestyle='solid')
-            axDDY[i].set_ylim(Constants.DDYLIM[s_plot])
-            axDDY[i].tick_params('y', colors=paint)
-            axDDY[i].yaxis.tick_left()
-            axDDY[i].spines['left'].set_position(('axes', 1.0))
-            # axDDYi.margins(y=0.5)
-            x0, x1 = Constants.DDYLIM[s_plot]
-            axDDY[i].set_ylim(x0-0.1*(x1-x0), x1+0.1*(x1-x0))
-            # axDDYi.grid()
+            # axDDY[i].set_ylim(Constants.DDYLIM[s_plot])
+            # axDDY[i].tick_params('y', colors=paint)
+            # axDDY[i].yaxis.tick_left()
+            # axDDY[i].spines['left'].set_position(('axes', 1.0))
+            # # axDDYi.margins(y=0.5)
+            # x0, x1 = Constants.DDYLIM[s_plot]
+            # axDDY[i].set_ylim(x0-0.1*(x1-x0), x1+0.1*(x1-x0))
+            # # axDDYi.grid()
             
         # fig.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=4)
 
-    name = 'C:/Users/malte/Documents/master/dewpoint_project/dewpoint_code/readout/4'            
-    fig.tight_layout()
-    # plt.savefig(out_full_path_png)
-    if PLOTOPTION == 'pgf':
-        plt.savefig('lolza.pgf', format = 'pgf')
-    else:
-        plt.savefig(name + '.pdf', bbox_inches='tight')
+        # plt.minorticks_off()
+        # axT[0].autoscale()
+        # axY[0].autoscale()
+        fig.set_figwidth(3.3)
+        fig.set_figheight(2.5)
+        plt.gcf().set_size_inches(3.3, 2.5)
+        # plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        fig.savefig('cap_t25rh50.jpg', dpi=600)
         plt.show()
 
 
